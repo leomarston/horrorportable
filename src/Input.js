@@ -13,8 +13,10 @@ export default class Input {
     this.crouch = false;
     this._edges = { jump: false, flashlight: false, pause: false };
     this.locked = false;
+    this._dragging = false;
 
     this._touch = { active: false, moveId: null, lookId: null, ox: 0, oy: 0, lx: 0, ly: 0, runHeld: false };
+    this._touchMove = { x: 0, y: 0 };
 
     this._bindKeyboard();
     this._bindMouse();
@@ -52,17 +54,23 @@ export default class Input {
   _bindMouse() {
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
-      if (!this.locked) this._edges.pause = true; // releasing lock pauses
     });
+    // Look works either via pointer-lock OR click-drag (fallback when lock is
+    // unavailable, e.g. inside an embedded/secured preview frame).
+    this.canvas.addEventListener('mousedown', () => { this._dragging = true; });
+    addEventListener('mouseup', () => { this._dragging = false; });
     addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
-      this._look.x += e.movementX || 0;
-      this._look.y += e.movementY || 0;
+      if (this.locked || this._dragging) {
+        this._look.x += e.movementX || 0;
+        this._look.y += e.movementY || 0;
+      }
     });
   }
 
   requestLock() {
-    if (this.canvas.requestPointerLock) this.canvas.requestPointerLock();
+    if (!this.canvas.requestPointerLock) return;
+    const p = this.canvas.requestPointerLock();
+    if (p && p.catch) p.catch(() => {}); // ignore denial (we don't depend on it)
   }
   exitLock() {
     if (document.exitPointerLock) document.exitPointerLock();
@@ -83,12 +91,12 @@ export default class Input {
       let dy = (e.clientY - t.oy) / R();
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }
-      this.move.x = dx; this.move.y = -dy;
+      this._touchMove.x = dx; this._touchMove.y = -dy;
       knob.style.transform = `translate(${-50 + dx * 35}%, ${-50 + dy * 35}%)`;
     });
     const endStick = (e) => {
       if (t.moveId !== e.pointerId) return;
-      t.moveId = null; this.move.x = 0; this.move.y = 0;
+      t.moveId = null; this._touchMove.x = 0; this._touchMove.y = 0;
       knob.style.transform = 'translate(-50%,-50%)';
     };
     stick.addEventListener('pointerup', endStick);
@@ -112,8 +120,10 @@ export default class Input {
   // ---------------- frame API ----------------
   update() {
     const { mx, my } = this._readKeys();
-    // keyboard overrides touch stick when pressed
+    // Keyboard when pressed, otherwise the touch stick (and reset to zero when
+    // neither is active so movement never sticks after release).
     if (mx !== 0 || my !== 0) { this.move.x = mx; this.move.y = my; }
+    else { this.move.x = this._touchMove.x; this.move.y = this._touchMove.y; }
   }
 
   consumeLook() {

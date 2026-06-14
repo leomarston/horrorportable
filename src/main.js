@@ -81,8 +81,8 @@ class Game {
 
   _enter() {
     this.ui.enterGame();
-    if (this.touch) this.state = 'playing';
-    else this.input.requestLock(); // pointerlockchange flips us to 'playing'
+    this.state = 'playing';              // play immediately — never gate on pointer-lock
+    if (!this.touch) this.input.requestLock(); // best-effort mouse capture (ok if denied)
   }
 
   _setupTouch() {
@@ -100,10 +100,11 @@ class Game {
     document.addEventListener('pointerlockchange', () => {
       if (this.state === 'loading' || this.state === 'menu') return;
       if (this.input.locked) { this.state = 'playing'; this.ui.hidePause(); }
-      else this._pause();
+      else if (this.state === 'playing') this._pause(); // lost lock while playing (Esc) → pause
     });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'playing' && !this.touch) this.input.exitLock();
+    // Click in-game to (re)capture the mouse, when pointer-lock is available.
+    this.canvas.addEventListener('click', () => {
+      if (this.state === 'playing' && !this.touch && !this.input.locked) this.input.requestLock();
     });
   }
 
@@ -115,7 +116,7 @@ class Game {
       statsOn: this.statsOn,
       onPickTier: (t) => this._pickTier(t),
       onToggleStats: () => { this.statsOn = !this.statsOn; this.ui.setStatsVisible(this.statsOn); },
-      onResume: () => this.input.requestLock(),
+      onResume: () => { this.ui.hidePause(); this.state = 'playing'; this.input.requestLock(); },
     });
   }
 
@@ -131,7 +132,10 @@ class Game {
       this.player.update(dt);
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);
-      if (this.input.consumeEdge('pause')) this.input.exitLock();
+      if (this.input.consumeEdge('pause')) {
+        if (this.input.locked) this.input.exitLock(); // pointerlockchange → pause
+        else this._pause();                            // no lock: pause directly
+      }
     } else if (this.world) {
       // keep the world breathing behind the menus
       this.flashlight.update(dt, this.engine.camera);
