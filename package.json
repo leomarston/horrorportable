@@ -1,0 +1,28 @@
+{
+  "name": "abandoned-house-horror",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A first-person browser horror game built on the Abandoned House asset pack.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "assets:inspect": "gltf-transform inspect _assetsrc/Abandoned_House/Models/Abandoned_House.glb",
+    "assets:optimize": "node scripts/optimize-assets.mjs"
+  },
+  "dependencies": {
+    "three": "0.169.0",
+    "three-mesh-bvh": "^0.8.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.1.0",
+    "@gltf-transform/core": "^4.1.0",
+    "@gltf-transform/extensions": "^4.1.0",
+    "@gltf-transform/functions": "^4.1.0",
+    "draco3dgltf": "^1.5.7",
+    "meshoptimizer": "^0.22.0",
+    "sharp": "^0.33.5",
+    "vite": "^5.4.0"
+  }
+}
