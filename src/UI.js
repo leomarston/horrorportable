@@ -8,9 +8,17 @@ export default class UI {
       loading: $('loading'), barFill: $('bar-fill'), status: $('loading-status'),
       start: $('start'), enterBtn: $('enter-btn'), qualityButtons: $('quality-buttons'), deviceHint: $('device-hint'),
       pause: $('pause'), resumeBtn: $('resume-btn'), settings: $('settings'),
-      hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'),
+      hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
     };
+    this._promptText = null;
+  }
+
+  setPrompt(text) {
+    if (text === this._promptText) return;
+    this._promptText = text;
+    if (text) { this.el.prompt.innerHTML = `<b>E</b> &nbsp;${text}`; this.el.prompt.classList.remove('hidden'); }
+    else this.el.prompt.classList.add('hidden');
   }
 
   setProgress(p) {

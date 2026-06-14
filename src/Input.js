@@ -11,7 +11,7 @@ export default class Input {
     this._look = { x: 0, y: 0 };
     this.run = false;
     this.crouch = false;
-    this._edges = { jump: false, flashlight: false, pause: false };
+    this._edges = { jump: false, flashlight: false, pause: false, interact: false };
     this.locked = false;
     this._dragging = false;
 
@@ -30,6 +30,7 @@ export default class Input {
       this.keys.add(c);
       if (c === 'Space') this._edges.jump = true;
       if (c === 'KeyF') this._edges.flashlight = true;
+      if (c === 'KeyE') this._edges.interact = true;
       if (c === 'Escape') this._edges.pause = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(c)) e.preventDefault();
     }, { passive: false });
@@ -78,7 +79,7 @@ export default class Input {
 
   // ---------------- touch ----------------
   enableTouch(els) {
-    const { stick, knob, look, runBtn, lightBtn } = els;
+    const { stick, knob, look, runBtn, lightBtn, useBtn } = els;
     const t = this._touch;
     const R = () => stick.clientWidth * 0.5;
 
@@ -116,6 +117,7 @@ export default class Input {
 
     runBtn.addEventListener('pointerdown', () => { t.runHeld = !t.runHeld; runBtn.classList.toggle('active', t.runHeld); });
     lightBtn.addEventListener('pointerdown', () => { this._edges.flashlight = true; });
+    if (useBtn) useBtn.addEventListener('pointerdown', () => { this._edges.interact = true; });
   }
 
   // ---------------- frame API ----------------

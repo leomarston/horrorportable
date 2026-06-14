@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
-import { NON_SOLID_MATERIAL } from './config.js';
+import { NON_SOLID_MATERIAL, DOOR } from './config.js';
 
 // Accelerate ray casts against any mesh that carries a boundsTree.
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -26,7 +26,9 @@ export default class Collider {
 
     root.traverse((o) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
-      const tag = `${(o.material && o.material.name) || ''} ${o.name || ''}`;
+      const matName = (o.material && o.material.name) || '';
+      if (matName === DOOR.material) return; // the openable door is handled by the Doors system
+      const tag = `${matName} ${o.name || ''}`;
       if (NON_SOLID_MATERIAL.test(tag)) return; // skip cobwebs / grass / leaves
 
       const pos = o.geometry.attributes.position;

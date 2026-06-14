@@ -78,6 +78,16 @@ canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
   border-radius: 50%; background: rgba(220, 215, 200, .55);
   box-shadow: 0 0 4px rgba(0,0,0,.9); mix-blend-mode: exclusion;
 }
+.interact-prompt {
+  position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
+  font-size: .8rem; letter-spacing: .12em; color: #e6dccb;
+  text-shadow: 0 2px 6px #000, 0 0 14px rgba(0,0,0,.9);
+  padding: .35rem .8rem; border: 1px solid rgba(200,194,180,.28);
+  border-radius: 3px; background: rgba(10,9,7,.35); backdrop-filter: blur(1px);
+  white-space: nowrap;
+}
+.interact-prompt b { color: #fff; }
+
 .hud-hint {
   position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
   font-size: .66rem; letter-spacing: .18em; text-transform: uppercase; color: rgba(200,194,180,.45);

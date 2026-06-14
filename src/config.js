@@ -9,6 +9,16 @@
 
 export const ASSET_URL = './models/abandoned_house.glb';
 
+// The house's front door — a single isolated mesh using the "Puerta" material.
+// It's kept out of the static collider and driven by the Doors system instead.
+export const DOOR = {
+  material: 'Puerta',
+  openAngle: Math.PI * 0.5, // swings inward (−Z)
+  damp: 9,                  // open/close animation rate
+  range: 4.5,               // how close you must be to interact (units)
+  blockBelow: 0.14,         // door blocks while |angle| is under this (≈ closed)
+};
+
 // Materials that must NOT collide (decorative billboards / decals you'd snag on).
 export const NON_SOLID_MATERIAL = /telar|planta|pasto|grass|cesped|hierba|hoja|leaf|spider|web/i;
 
@@ -24,7 +34,7 @@ export const PLAYER = {
   airAccel: 4,
   damping: 10,           // horizontal velocity damping when no input
   gravity: -23,          // units/s^2 (~-18 m/s^2, slightly punchy)
-  jumpSpeed: 5.2,        // → ~0.45 m hop, mostly to step over low debris
+  jumpSpeed: 8.5,        // → ~1.2 m hop
   fallRespawnY: -40,     // if we somehow fall through the world, respawn
   headBobSpeed: 9.5,
   headBobAmount: 0.045,

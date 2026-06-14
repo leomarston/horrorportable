@@ -25,6 +25,8 @@ export default class Player {
     this.onGround = false;
     this.bobT = 0;
     this.bob = 0;
+    this.extraColliders = []; // dynamic BVHs (e.g. closed doors): { geometry, active() }
+    this._trees = [];
 
     // scratch
     this._seg = new THREE.Line3();
@@ -64,7 +66,7 @@ export default class Player {
 
     // ---- desired horizontal velocity from input ----
     this._fwd.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)).multiplyScalar(-1); // yaw 0 → -Z
-    this._right.set(this._fwd.z, 0, -this._fwd.x);
+    this._right.set(-this._fwd.z, 0, this._fwd.x); // right = forward × up (so D = screen-right)
     let ix = input.move.x, iy = input.move.y;
     const ilen = Math.hypot(ix, iy);
     if (ilen > 1) { ix /= ilen; iy /= ilen; }
@@ -126,33 +128,38 @@ export default class Player {
     this._applyCamera(dt);
   }
 
-  /** Resolve the capsule against the BVH; returns true if it landed on ground. */
+  /** Resolve the capsule against the world BVH (+ any active extra colliders). */
   _collide(sdt) {
     const radius = PLAYER.radius;
     const seg = this._seg;
     seg.start.copy(this.position);
     seg.end.copy(this.position).y -= this.segLen;
 
-    this._box.makeEmpty();
-    this._box.expandByPoint(seg.start);
-    this._box.expandByPoint(seg.end);
-    this._box.min.addScalar(-radius);
-    this._box.max.addScalar(radius);
+    // world + active dynamic colliders (e.g. a closed door)
+    this._trees.length = 0;
+    this._trees.push(this.collider.geometry.boundsTree);
+    for (const ec of this.extraColliders) if (ec.active()) this._trees.push(ec.geometry.boundsTree);
 
-    const tree = this.collider.geometry.boundsTree;
     const triPoint = this._triPoint, capPoint = this._capPoint, box = this._box;
-    tree.shapecast({
-      intersectsBounds: (b) => b.intersectsBox(box),
-      intersectsTriangle: (tri) => {
-        const dist = tri.closestPointToSegment(seg, triPoint, capPoint);
-        if (dist < radius) {
-          const depth = radius - dist;
-          this._dir.copy(capPoint).sub(triPoint).normalize();
-          seg.start.addScaledVector(this._dir, depth);
-          seg.end.addScaledVector(this._dir, depth);
-        }
-      },
-    });
+    for (const tree of this._trees) {
+      box.makeEmpty();
+      box.expandByPoint(seg.start);
+      box.expandByPoint(seg.end);
+      box.min.addScalar(-radius);
+      box.max.addScalar(radius);
+      tree.shapecast({
+        intersectsBounds: (b) => b.intersectsBox(box),
+        intersectsTriangle: (tri) => {
+          const dist = tri.closestPointToSegment(seg, triPoint, capPoint);
+          if (dist < radius) {
+            const depth = radius - dist;
+            this._dir.copy(capPoint).sub(triPoint).normalize();
+            seg.start.addScaledVector(this._dir, depth);
+            seg.end.addScaledVector(this._dir, depth);
+          }
+        },
+      });
+    }
 
     this._newPos.copy(seg.start);
     this._rawDelta.subVectors(this._newPos, this.position);

@@ -16,7 +16,8 @@
       <!-- Cinematic letterbox + post overlays are drawn in WebGL; these are UI only -->
       <div id="hud" class="hidden">
         <div id="crosshair"></div>
-        <div id="hud-hint" class="hud-hint">F — Flashlight &nbsp;·&nbsp; Shift — Run &nbsp;·&nbsp; Ctrl — Crouch &nbsp;·&nbsp; Esc — Pause</div>
+        <div id="interact-prompt" class="interact-prompt hidden"></div>
+        <div id="hud-hint" class="hud-hint">E — Interact &nbsp;·&nbsp; F — Flashlight &nbsp;·&nbsp; Shift — Run &nbsp;·&nbsp; Ctrl — Crouch &nbsp;·&nbsp; Esc — Pause</div>
         <div id="stats" class="stats hidden"></div>
       </div>
 
@@ -40,8 +41,8 @@
           <ul class="controls">
             <li><b>W A S D</b> / arrows — move</li>
             <li><b>Mouse</b> — look</li>
-            <li><b>Shift</b> — run &nbsp;·&nbsp; <b>Ctrl</b> — crouch &nbsp;·&nbsp; <b>Space</b> — step over</li>
-            <li><b>F</b> — flashlight &nbsp;·&nbsp; <b>Esc</b> — pause</li>
+            <li><b>Shift</b> — run &nbsp;·&nbsp; <b>Ctrl</b> — crouch &nbsp;·&nbsp; <b>Space</b> — jump</li>
+            <li><b>E</b> — open doors &nbsp;·&nbsp; <b>F</b> — flashlight &nbsp;·&nbsp; <b>Esc</b> — pause</li>
           </ul>
           <div class="quality-row">
             <span>Quality</span>
@@ -67,6 +68,7 @@
         <div id="touch-move" class="touch-stick"><div class="touch-knob"></div></div>
         <div id="touch-look" class="touch-look"></div>
         <div class="touch-buttons">
+          <button id="touch-use" class="touch-btn">USE</button>
           <button id="touch-run" class="touch-btn">RUN</button>
           <button id="touch-light" class="touch-btn">LIGHT</button>
         </div>
