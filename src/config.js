@@ -23,9 +23,11 @@ export const DOOR = {
 export const NON_SOLID_MATERIAL = /telar|planta|pasto|grass|cesped|hierba|hoja|leaf|spider|web/i;
 
 export const PLAYER = {
-  radius: 0.45,          // capsule radius (units)
-  standSegment: 1.55,    // cylinder length standing  → eye ≈ 2.0u (~1.55 m) above feet
-  crouchSegment: 0.55,   // cylinder length crouched   → eye ≈ 1.0u (~0.8 m)
+  // Sized to the asset: the house door opening is ~2.1u tall / ~1.0u wide, so the
+  // capsule must be shorter/narrower than that to fit through doorways & overhangs.
+  radius: 0.4,           // capsule radius (units)  → ~0.8u wide, clears the 1.0u door
+  standSegment: 1.1,     // total height ≈ 1.9u (eye ≈ 1.5u above feet) → fits the 2.1u door
+  crouchSegment: 0.5,    // crouched eye ≈ 0.9u above feet
   eyeFromTop: 0.0,       // camera sits at top sphere centre
   walkSpeed: 3.4,        // units/s (~2.6 m/s)
   runSpeed: 6.2,         // units/s (~4.8 m/s)
