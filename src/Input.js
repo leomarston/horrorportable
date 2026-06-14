@@ -83,7 +83,8 @@ export default class Input {
     const R = () => stick.clientWidth * 0.5;
 
     stick.addEventListener('pointerdown', (e) => {
-      t.moveId = e.pointerId; t.ox = e.clientX; t.oy = e.clientY; stick.setPointerCapture(e.pointerId);
+      t.moveId = e.pointerId; t.ox = e.clientX; t.oy = e.clientY;
+      try { stick.setPointerCapture(e.pointerId); } catch (_) { /* some browsers reject this */ }
     });
     stick.addEventListener('pointermove', (e) => {
       if (t.moveId !== e.pointerId) return;
