@@ -143,3 +143,18 @@ export const ADAPTIVE = {
   sampleSeconds: 1.0,
   step: 0.08,
 };
+
+// The wandering monster (DarkFox), confined to the elevated interior room.
+export const MONSTER = {
+  url: './models/darkfox.glb',
+  height: 2.4,                 // target height in house units
+  home: { x: -47, z: -127 },   // centre of its room, inside the house
+  roam: { minX: -55, maxX: -40, minZ: -132, maxZ: -122 }, // walkable box (interior)
+  walkSpeed: 1.7,              // units/s
+  runSpeed: 4.2,
+  turnRate: 2.4,              // rad/s
+  arriveDist: 1.2,            // distance to consider a waypoint reached
+  pauseRange: [1.2, 3.5],     // idle pause between waypoints (s)
+  feetHeight: 0,              // computed at load
+};
+

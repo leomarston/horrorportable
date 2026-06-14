@@ -5,6 +5,7 @@ import { loadWorld } from './AssetLoader.js';
 import World from './World.js';
 import Player from './Player.js';
 import Doors from './Doors.js';
+import Monster from './Monster.js';
 import Flashlight from './Flashlight.js';
 import Input from './Input.js';
 import PostFX from './PostFX.js';
@@ -53,6 +54,10 @@ class Game {
 
       this.doors = new Doors(this.engine.scene, this.engine.camera);
       this.player.extraColliders = this.doors.colliders;
+
+      this.ui.setStatus('something stirs inside…');
+      const monsterGltf = await Monster.load();
+      this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
 
       // Pre-compile shaders so the first movements don't hitch.
       this.engine.renderer.compile(this.engine.scene, this.engine.camera);
@@ -137,6 +142,7 @@ class Game {
       this.player.update(dt);
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);
+      this.monster.update(dt);
       if (this.input.consumeEdge('interact')) this.doors.interact(this.engine.camera);
       this.doors.update(dt, this.engine.camera, (txt) => this.ui.setPrompt(txt));
       if (this.input.consumeEdge('pause')) {
