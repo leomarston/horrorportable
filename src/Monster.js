@@ -55,8 +55,8 @@ export default class Monster {
 
     this._rig();
 
-    // ---- wander state ----
-    this.feetY = collider.groundY(MONSTER.home.x, MONSTER.home.z, 7.0) ?? 5.5;
+    // ---- wander state ---- (low ray → ground floor, not the upper floor)
+    this.feetY = collider.groundY(MONSTER.home.x, MONSTER.home.z, 2.5) ?? -0.2;
     this.pos = new THREE.Vector3(MONSTER.home.x, this.feetY, MONSTER.home.z);
     this.heading = 0;                // face +Z initially (toward the door)
     this.speed = 0;
@@ -109,11 +109,12 @@ export default class Monster {
   // ---------------- wandering ----------------
   _newTarget() {
     const r = MONSTER.roam;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       const x = THREE.MathUtils.lerp(r.minX, r.maxX, Math.random());
       const z = THREE.MathUtils.lerp(r.minZ, r.maxZ, Math.random());
-      const y = this.collider.groundY(x, z, this.feetY + 1.5);
-      if (y != null && Math.abs(y - this.feetY) < 3) { this.target.set(x, y, z); return; }
+      const y = this.collider.groundY(x, z, this.feetY + MONSTER.floorScan);
+      // keep targets on the ground floor (reject voids / big drops / the upper floor)
+      if (y != null && y > this.feetY - 0.6 && y < this.feetY + 1.0) { this.target.set(x, y, z); return; }
     }
     this.target.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
   }
@@ -160,14 +161,19 @@ export default class Monster {
 
     this.speed = THREE.MathUtils.damp(this.speed, desiredSpeed, 6, dt);
 
-    // move forward along heading, follow the floor
+    // move forward along heading, following the ground floor; never step off a
+    // ledge into the void (treat a big drop / missing floor as a wall)
     if (this.speed > 0.01) {
       const adv = this.speed * dt;
       const nx = this.pos.x + Math.sin(this.heading) * adv;
       const nz = this.pos.z + Math.cos(this.heading) * adv;
-      const fy = this.collider.groundY(nx, nz, this.feetY + 1.0);
-      if (fy != null && Math.abs(fy - this.feetY) < 1.5) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
-      this.pos.set(nx, this.feetY, nz);
+      const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
+      if (fy == null || fy < this.feetY - 0.6) {
+        this.speed = 0; this.pauseLeft = 0.25; this._newTarget(); // edge ahead → stop & re-route
+      } else {
+        if (Math.abs(fy - this.feetY) < 1.0) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
+        this.pos.set(nx, this.feetY, nz);
+      }
     } else {
       this.pos.y = this.feetY;
     }

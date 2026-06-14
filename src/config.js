@@ -144,17 +144,19 @@ export const ADAPTIVE = {
   step: 0.08,
 };
 
-// The wandering monster (DarkFox), confined to the elevated interior room.
+// The wandering monster (DarkFox), on the reachable ground floor of the house
+// (floor ≈ -0.2). Floor detection uses LOW rays so it tracks the ground floor,
+// not the upper floor / roof above it.
 export const MONSTER = {
   url: './models/darkfox.glb',
   height: 2.4,                 // target height in house units
-  home: { x: -47, z: -127 },   // centre of its room, inside the house
-  roam: { minX: -55, maxX: -40, minZ: -132, maxZ: -122 }, // walkable box (interior)
-  walkSpeed: 1.7,              // units/s
+  home: { x: -38, z: -125 },   // centre of its room, on the ground floor
+  roam: { minX: -44, maxX: -31, minZ: -129, maxZ: -122 }, // walkable box (ground floor)
+  floorScan: 1.4,             // ray starts this far above feet → skips the upper floor
+  walkSpeed: 1.7,             // units/s
   runSpeed: 4.2,
-  turnRate: 2.4,              // rad/s
-  arriveDist: 1.2,            // distance to consider a waypoint reached
-  pauseRange: [1.2, 3.5],     // idle pause between waypoints (s)
-  feetHeight: 0,              // computed at load
+  turnRate: 2.4,             // rad/s
+  arriveDist: 1.0,           // distance to consider a waypoint reached
+  pauseRange: [1.2, 3.5],    // idle pause between waypoints (s)
 };
 
