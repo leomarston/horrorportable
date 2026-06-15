@@ -9,9 +9,31 @@ export default class UI {
       hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
       scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
+      bookCount: $('book-count'), bookGoal: $('book-goal'), batteryFill: $('battery-fill'),
+      win: $('win'), winAgain: $('win-again'),
     };
     this._promptText = null;
+    this._batLevel = -1;
   }
+
+  setBooks(n, goal) {
+    this.el.bookCount.textContent = n;
+    this.el.bookGoal.textContent = goal;
+  }
+
+  setBattery(level) {
+    const p = Math.round(Math.max(0, Math.min(1, level)) * 100);
+    if (p === this._batLevel) return;
+    this._batLevel = p;
+    this.el.batteryFill.style.width = p + '%';
+    this.el.batteryFill.style.background = p > 40 ? '#6ad07a' : p > 15 ? '#d6c24a' : '#cf4a3a';
+  }
+
+  showWin(onAgain) {
+    this.el.win.classList.remove('hidden');
+    this.el.winAgain.onclick = onAgain;
+  }
+  hideWin() { this.el.win.classList.add('hidden'); }
 
   showScare() {
     this.el.scare.classList.remove('hidden');

@@ -6,6 +6,7 @@ import World from './World.js';
 import Player from './Player.js';
 import Doors from './Doors.js';
 import Monster from './Monster.js';
+import Pickups from './Pickups.js';
 import Flashlight from './Flashlight.js';
 import Input from './Input.js';
 import PostFX from './PostFX.js';
@@ -58,6 +59,13 @@ class Game {
       const monsterGltf = await Monster.load();
       this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
       this.monster.onCaught = () => this._jumpscare();
+
+      this.bookCount = 0;
+      this.pickups = new Pickups(this.engine.scene, this.world.collider, this.player, this.flashlight, {
+        onBook: () => this._onBook(),
+        onBattery: () => this._onBattery(),
+      });
+      this.ui.setBooks(0, this.pickups.bookTotal);
 
       // Pre-compile shaders so the first movements don't hitch.
       this.engine.renderer.compile(this.engine.scene, this.engine.camera);
@@ -172,6 +180,37 @@ class Game {
     }
   }
 
+  // ---------------- pickups / win ----------------
+  _onBook() {
+    this.bookCount++;
+    this.ui.setBooks(this.bookCount, this.pickups.bookTotal);
+    this._blip(880);
+    if (this.bookCount >= this.pickups.bookTotal) this._win();
+  }
+
+  _onBattery() { this._blip(420); }
+
+  _win() {
+    if (this.state === 'win') return;
+    this.state = 'win';
+    if (this.input.locked) this.input.exitLock();
+    this.ui.showWin(() => location.reload());
+  }
+
+  _blip(freq) {
+    const ac = this.audio; if (!ac) return;
+    if (ac.state === 'suspended') ac.resume();
+    const now = ac.currentTime;
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(freq, now);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.6, now + 0.08);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now + 0.2);
+  }
+
   _setupTouch() {
     this.ui.showTouch();
     this.input.enableTouch({
@@ -219,6 +258,8 @@ class Game {
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);
       this.monster.update(dt);
+      this.pickups.update(dt);
+      this.ui.setBattery(this.flashlight.battery);
       if (this.input.consumeEdge('interact')) this.doors.interact(this.engine.camera);
       this.doors.update(dt, this.engine.camera, (txt) => this.ui.setPrompt(txt));
       if (this.input.consumeEdge('pause')) {

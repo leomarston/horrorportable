@@ -101,11 +101,22 @@ export default class Monster {
     this.tail.forEach(store);
   }
 
-  // bone.quaternion = rest * rotation(axis, angle)
+  // bone.quaternion = rest * rotation(localAxis, angle)
   _rot(bone, axis, angle) {
     if (!bone) return;
     const rest = this.rest.get(bone);
     bone.quaternion.copy(rest).multiply(_q.setFromAxisAngle(axis, angle));
+  }
+
+  // Rotate a bone about a WORLD-space axis through its pivot, relative to rest.
+  // Lets us swing limbs correctly regardless of each bone's roll (the arm bones
+  // are rolled so a local-X rotation only twists them — invisible).
+  _rotWorld(bone, worldAxis, angle) {
+    if (!bone || !bone.parent) return;
+    bone.parent.getWorldQuaternion(_pwq).invert();
+    _v2.copy(worldAxis).applyQuaternion(_pwq); // world axis → bone's parent-local space
+    const rest = this.rest.get(bone);
+    bone.quaternion.copy(rest).premultiply(_q.setFromAxisAngle(_v2.normalize(), angle));
   }
 
   _applyTransform() {
@@ -155,8 +166,9 @@ export default class Monster {
     const nx = this.pos.x + Math.sin(this.heading) * adv;
     const nz = this.pos.z + Math.cos(this.heading) * adv;
     const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
-    if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; }
-    if (Math.abs(fy - this.feetY) < 1.4) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
+    if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; } // void / big drop
+    if (fy - this.feetY > 0.6) { this.speed = 0; return false; }                    // too tall to step up (table/wall)
+    if (Math.abs(fy - this.feetY) < 1.0) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
     this.pos.set(nx, this.feetY, nz);
     return true;
   }
@@ -225,27 +237,27 @@ export default class Monster {
   }
 
   _wander(dt) {
-    const toT = _v.set(this.target.x - this.pos.x, 0, this.target.z - this.pos.z);
-    const distToT = toT.length();
-    let desiredSpeed = 0;
+    const dx = this.target.x - this.pos.x, dz = this.target.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
 
     if (this.pauseLeft > 0) {
       this.pauseLeft -= dt;
-    } else if (distToT < MONSTER.arriveDist) {
+      this.speed = THREE.MathUtils.damp(this.speed, 0, 6, dt);
+      this._advance(dt, 0.6);
+      return;
+    }
+    if (dist < MONSTER.arriveDist) {
       this.pauseLeft = THREE.MathUtils.lerp(MONSTER.pauseRange[0], MONSTER.pauseRange[1], Math.random());
       this._newTarget();
-    } else {
-      const d = this._turnToward(Math.atan2(toT.x, toT.z), MONSTER.turnRate, dt);
-      const aligned = Math.abs(d) < 0.6;
-      if (aligned && this._rayHit(this.heading, this.halfWidth + 0.8)) {
-        this.heading += (Math.random() < 0.5 ? 1 : -1) * 1.2;
-        this._newTarget();
-      } else if (aligned) {
-        desiredSpeed = MONSTER.walkSpeed;
-      }
+      return;
     }
-    this.speed = THREE.MathUtils.damp(this.speed, desiredSpeed, 6, dt);
-    if (!this._advance(dt, 0.6)) { if (desiredSpeed > 0) { this.pauseLeft = 0.25; this._newTarget(); } }
+    // route around walls toward the waypoint (wall-following via steer hysteresis)
+    const steer = this._avoidSteer(Math.atan2(dx, dz), this.halfWidth + 1.0);
+    const d = this._turnToward(steer, MONSTER.turnRate, dt);
+    const want = Math.abs(d) > 1.0 ? MONSTER.walkSpeed * 0.4 : MONSTER.walkSpeed;
+    this.speed = THREE.MathUtils.damp(this.speed, want, 6, dt);
+    if (this._advance(dt, 0.6)) { this._stuckT = 0; }
+    else { this._stuckT = (this._stuckT || 0) + dt; if (this._stuckT > 0.7) { this._stuckT = 0; this._newTarget(); } }
   }
 
   /** Reset to calm wandering at home (after a respawn). */
@@ -280,7 +292,9 @@ export default class Monster {
     const p = this.phase;
     const A = 0.55 + run * 0.35;        // leg swing amplitude
     const K = 0.9 + run * 0.6;          // knee bend
-    const arm = 0.4 + run * 0.5;
+    const arm = 0.6 + run * 0.6;        // arm swing amplitude
+    // monster's right-axis in world space → swings limbs front/back
+    const rax = _rax.set(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
     // legs (swing about local X), opposite phase L/R
     this._rot(this.bones.thighL, X, Math.sin(p) * A * moving);
@@ -291,11 +305,11 @@ export default class Monster {
     this._rot(this.bones.footL, X, Math.sin(p + 0.7) * 0.25 * moving);
     this._rot(this.bones.footR, X, Math.sin(p + Math.PI + 0.7) * 0.25 * moving);
 
-    // arms swing opposite the legs
-    this._rot(this.bones.uarmL, X, Math.sin(p + Math.PI) * arm * moving);
-    this._rot(this.bones.uarmR, X, Math.sin(p) * arm * moving);
-    this._rot(this.bones.forearmL, X, -(0.3 + Math.max(0, Math.sin(p)) * 0.4) * moving);
-    this._rot(this.bones.forearmR, X, -(0.3 + Math.max(0, Math.sin(p + Math.PI)) * 0.4) * moving);
+    // arms swing opposite the legs (about the world right-axis so it's visible)
+    this._rotWorld(this.bones.uarmL, rax, Math.sin(p + Math.PI) * arm * moving);
+    this._rotWorld(this.bones.uarmR, rax, Math.sin(p) * arm * moving);
+    this._rotWorld(this.bones.forearmL, rax, -(0.25 + Math.max(0, Math.sin(p)) * 0.5) * moving);
+    this._rotWorld(this.bones.forearmR, rax, -(0.25 + Math.max(0, Math.sin(p + Math.PI)) * 0.5) * moving);
 
     // torso: vertical bob (twice per stride) + lateral sway + breathing when idle
     const breathe = Math.sin(this.t * 1.6) * 0.02 * (1 - moving);
@@ -324,3 +338,6 @@ export default class Monster {
 
 const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _pwq = new THREE.Quaternion();
+const _rax = new THREE.Vector3();

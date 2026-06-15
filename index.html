@@ -17,7 +17,14 @@
       <div id="hud" class="hidden">
         <div id="crosshair"></div>
         <div id="interact-prompt" class="interact-prompt hidden"></div>
-        <div id="hud-hint" class="hud-hint">E — Interact &nbsp;·&nbsp; F — Flashlight &nbsp;·&nbsp; Shift — Run &nbsp;·&nbsp; Ctrl — Crouch &nbsp;·&nbsp; Esc — Pause</div>
+        <div id="hud-top" class="hud-top">
+          <div id="book-counter" class="book-counter"><span class="ico">▤</span> <b id="book-count">0</b> / <span id="book-goal">10</span></div>
+          <div id="battery" class="battery" title="Torch battery">
+            <div class="battery-cap"></div>
+            <div class="battery-shell"><div id="battery-fill" class="battery-fill"></div></div>
+          </div>
+        </div>
+        <div id="hud-hint" class="hud-hint">Collect the books &nbsp;·&nbsp; F — Flashlight &nbsp;·&nbsp; Shift — Run &nbsp;·&nbsp; Esc — Pause</div>
         <div id="stats" class="stats hidden"></div>
       </div>
 
@@ -74,6 +81,16 @@
       <div id="scare" class="scare hidden">
         <div id="scare-flash" class="scare-flash"></div>
         <div id="scare-text" class="scare-text hidden">IT&nbsp;FOUND&nbsp;YOU</div>
+      </div>
+
+      <!-- Win -->
+      <div id="win" class="overlay hidden">
+        <div class="vignette"></div>
+        <div class="win-inner">
+          <h1 class="title win-title">YOU&nbsp;SURVIVED</h1>
+          <p class="subtitle">you gathered every book and lived</p>
+          <button id="win-again" class="enter-btn">PLAY AGAIN</button>
+        </div>
       </div>
     </div>
 
