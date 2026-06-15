@@ -68,6 +68,13 @@ export default class Monster {
     this._ray.firstHitOnly = true;
     this._tmp = new THREE.Vector3();
 
+    // ---- hunting state ----
+    this.state = 'wander';           // 'wander' | 'chase' | 'caught'
+    this.lastSeen = new THREE.Vector3();
+    this.loseTimer = 0;
+    this.onCaught = null;            // callback fired once when it grabs the player
+    this._avoidSide = 0;             // committed turn direction for wall-avoidance
+
     this._applyTransform();
   }
 
@@ -119,67 +126,147 @@ export default class Monster {
     this.target.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
   }
 
-  _wallAhead(dist) {
+  // Is there a wall within `dist` along heading `h`?
+  _rayHit(h, dist) {
     const origin = this._tmp.set(this.pos.x, this.feetY + 1.0, this.pos.z);
-    const dir = _v.set(Math.sin(this.heading), 0, Math.cos(this.heading));
-    this._ray.set(origin, dir);
+    _v.set(Math.sin(h), 0, Math.cos(h));
+    this._ray.set(origin, _v);
     this._ray.far = dist;
-    const hit = this._ray.intersectObject(this.collider.mesh, false);
-    return hit.length > 0;
+    return this._ray.intersectObject(this.collider.mesh, false).length > 0;
+  }
+
+  // Pick a heading toward `desired` that isn't blocked. Commits to a turn side
+  // (hysteresis) so it goes *around* furniture instead of oscillating in place.
+  _avoidSteer(desired, dist) {
+    if (!this._rayHit(desired, dist)) { this._avoidSide = 0; return desired; }
+    const side = this._avoidSide || (Math.random() < 0.5 ? 1 : -1);
+    for (const mag of [0.5, 0.9, 1.3, 1.8, 2.4]) {
+      if (!this._rayHit(desired + side * mag, dist)) { this._avoidSide = side; return desired + side * mag; }
+      if (!this._rayHit(desired - side * mag, dist)) { this._avoidSide = -side; return desired - side * mag; }
+    }
+    this._avoidSide = side;
+    return desired + side * 2.4; // boxed in — keep turning to escape
+  }
+
+  // Step toward heading, following the floor; refuse drops bigger than `dropTol`.
+  _advance(dt, dropTol) {
+    if (this.speed < 0.01) { this.pos.y = this.feetY; return false; }
+    const adv = this.speed * dt;
+    const nx = this.pos.x + Math.sin(this.heading) * adv;
+    const nz = this.pos.z + Math.cos(this.heading) * adv;
+    const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
+    if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; }
+    if (Math.abs(fy - this.feetY) < 1.4) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
+    this.pos.set(nx, this.feetY, nz);
+    return true;
+  }
+
+  _turnToward(targetHeading, rate, dt) {
+    let d = targetHeading - this.heading;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    this.heading += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
+    return d;
+  }
+
+  // Does it notice the player? Close range = sensed presence (no sightline needed,
+  // so a chair/wall corner doesn't hide you when you're right there). Farther
+  // away it must actually see you: clear line of sight AND within its vision cone.
+  _canSee() {
+    const p = this.player.position;
+    const dx = p.x - this.pos.x, dz = p.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > MONSTER.senseRange) return false;
+    if (dist <= MONSTER.hearRange) return true;
+
+    const from = this._tmp.set(this.pos.x, this.feetY + 1.9, this.pos.z);
+    _v.set(p.x - from.x, p.y - from.y, p.z - from.z);
+    const len = _v.length(); _v.normalize();
+    this._ray.set(from, _v); this._ray.far = len - 0.4;
+    if (this._ray.intersectObject(this.collider.mesh, false).length) return false;
+    let d = Math.atan2(dx, dz) - this.heading;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return Math.abs(d) <= MONSTER.senseFov;
   }
 
   update(dt) {
     this.t += dt;
+    if (this.state === 'caught') { this.speed = 0; this._animate(dt); this._applyTransform(); return; }
 
-    // decide where to go
+    const see = this._canSee();
+    if (see) { this.lastSeen.copy(this.player.position); this.loseTimer = 0; if (this.state !== 'chase') this.state = 'chase'; }
+    else if (this.state === 'chase') { this.loseTimer += dt; if (this.loseTimer > MONSTER.loseTime) this.state = 'wander'; }
+
+    if (this.state === 'chase') this._chase(dt, see);
+    else this._wander(dt);
+
+    this._animate(dt);
+    this._applyTransform();
+  }
+
+  _chase(dt, see) {
+    const dx = this.lastSeen.x - this.pos.x, dz = this.lastSeen.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
+    const desired = Math.atan2(dx, dz);
+    const steer = this._avoidSteer(desired, MONSTER.avoidDist);
+    const d = this._turnToward(steer, MONSTER.chaseTurnRate, dt);
+
+    const want = Math.abs(d) > 1.0 ? MONSTER.runSpeed * 0.35 : MONSTER.runSpeed;
+    this.speed = THREE.MathUtils.damp(this.speed, dist < 0.8 ? 0 : want, 8, dt);
+    this._advance(dt, 1.6); // relaxed drop tolerance so it can follow you down steps
+
+    // grab the player? (state flips to 'caught', so this only fires once until reset)
+    const p = this.player.position;
+    if (Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < MONSTER.catchDist) {
+      this.state = 'caught'; this.speed = 0;
+      if (this.onCaught) this.onCaught();
+    }
+  }
+
+  _wander(dt) {
     const toT = _v.set(this.target.x - this.pos.x, 0, this.target.z - this.pos.z);
     const distToT = toT.length();
     let desiredSpeed = 0;
 
     if (this.pauseLeft > 0) {
-      this.pauseLeft -= dt;                       // idling at a waypoint
+      this.pauseLeft -= dt;
     } else if (distToT < MONSTER.arriveDist) {
       this.pauseLeft = THREE.MathUtils.lerp(MONSTER.pauseRange[0], MONSTER.pauseRange[1], Math.random());
       this._newTarget();
     } else {
-      // steer heading toward the target (shortest angular direction)
-      const want = Math.atan2(toT.x, toT.z);
-      let d = want - this.heading;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      const step = Math.sign(d) * Math.min(Math.abs(d), MONSTER.turnRate * dt);
-      this.heading += step;
-      // only advance when roughly facing the target and nothing is in the way
+      const d = this._turnToward(Math.atan2(toT.x, toT.z), MONSTER.turnRate, dt);
       const aligned = Math.abs(d) < 0.6;
-      if (aligned && this._wallAhead(this.halfWidth + 0.8)) {
-        this.heading += (Math.random() < 0.5 ? 1 : -1) * 1.2; // bounce off the wall
+      if (aligned && this._rayHit(this.heading, this.halfWidth + 0.8)) {
+        this.heading += (Math.random() < 0.5 ? 1 : -1) * 1.2;
         this._newTarget();
       } else if (aligned) {
         desiredSpeed = MONSTER.walkSpeed;
       }
     }
-
     this.speed = THREE.MathUtils.damp(this.speed, desiredSpeed, 6, dt);
+    if (!this._advance(dt, 0.6)) { if (desiredSpeed > 0) { this.pauseLeft = 0.25; this._newTarget(); } }
+  }
 
-    // move forward along heading, following the ground floor; never step off a
-    // ledge into the void (treat a big drop / missing floor as a wall)
-    if (this.speed > 0.01) {
-      const adv = this.speed * dt;
-      const nx = this.pos.x + Math.sin(this.heading) * adv;
-      const nz = this.pos.z + Math.cos(this.heading) * adv;
-      const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
-      if (fy == null || fy < this.feetY - 0.6) {
-        this.speed = 0; this.pauseLeft = 0.25; this._newTarget(); // edge ahead → stop & re-route
-      } else {
-        if (Math.abs(fy - this.feetY) < 1.0) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
-        this.pos.set(nx, this.feetY, nz);
-      }
-    } else {
-      this.pos.y = this.feetY;
-    }
-
-    this._animate(dt);
+  /** Reset to calm wandering at home (after a respawn). */
+  reset() {
+    this.state = 'wander';
+    this.feetY = this.collider.groundY(MONSTER.home.x, MONSTER.home.z, 2.5) ?? -0.2;
+    this.pos.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
+    this.speed = 0; this.heading = 0; this.pauseLeft = 1.0; this.loseTimer = 0;
+    this.target.copy(this.pos);
     this._applyTransform();
+  }
+
+  /** A snarling lunge for the jumpscare; `t` is seconds into the scare. */
+  screamPose(t) {
+    const a = 1 + Math.sin(t * 22) * 0.12; // trembling
+    this._rot(this.bones.uarmL, X, -2.2 * a); this._rot(this.bones.uarmR, X, -2.2 * a); // arms thrown up
+    this._rot(this.bones.forearmL, X, -1.1); this._rot(this.bones.forearmR, X, -1.1);
+    this._rot(this.bones.spine, X, 0.25); this._rot(this.bones.chest, X, 0.3);
+    this._rot(this.bones.head, X, 0.35 * a);
+    for (let i = 0; i < this.tail.length; i++) this._rot(this.tail[i], Y, Math.sin(t * 18 + i) * 0.3);
+    this._bob = Math.sin(t * 25) * 0.04;
   }
 
   // ---------------- procedural skeletal animation ----------------
