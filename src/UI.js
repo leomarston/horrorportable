@@ -1,12 +1,10 @@
-import { QUALITY } from './config.js';
-
 const $ = (id) => document.getElementById(id);
 
 export default class UI {
   constructor() {
     this.el = {
       loading: $('loading'), barFill: $('bar-fill'), status: $('loading-status'),
-      start: $('start'), enterBtn: $('enter-btn'), qualityButtons: $('quality-buttons'), deviceHint: $('device-hint'),
+      start: $('start'), enterBtn: $('enter-btn'), deviceHint: $('device-hint'),
       pause: $('pause'), resumeBtn: $('resume-btn'), settings: $('settings'),
       hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
@@ -26,23 +24,11 @@ export default class UI {
   }
   setStatus(s) { this.el.status.textContent = s; }
 
-  showStart({ tier, deviceHint, onPickTier, onEnter }) {
+  showStart({ deviceHint, onEnter }) {
     this.el.loading.classList.add('hidden');
     this.el.start.classList.remove('hidden');
     this.el.deviceHint.textContent = deviceHint;
-    this._buildQuality(this.el.qualityButtons, tier, onPickTier);
     this.el.enterBtn.onclick = onEnter;
-  }
-
-  _buildQuality(container, tier, onPick) {
-    container.innerHTML = '';
-    for (const key of ['low', 'medium', 'high']) {
-      const b = document.createElement('button');
-      b.className = 'qbtn' + (key === tier ? ' active' : '');
-      b.textContent = QUALITY[key].label;
-      b.onclick = () => onPick(key);
-      container.appendChild(b);
-    }
   }
 
   enterGame() {
@@ -54,19 +40,10 @@ export default class UI {
     this._hintTimer = setTimeout(() => { this.el.hudHint.style.opacity = '0'; }, 6000);
   }
 
-  showPause({ tier, statsOn, onPickTier, onToggleStats, onResume }) {
+  showPause({ statsOn, onToggleStats, onResume }) {
     this.el.pause.classList.remove('hidden');
     this.el.resumeBtn.onclick = onResume;
     this.el.settings.innerHTML = '';
-
-    const qRow = document.createElement('div');
-    qRow.className = 'settings-row';
-    qRow.innerHTML = '<span>Quality (reloads)</span>';
-    const qOpts = document.createElement('div');
-    qOpts.className = 'opts';
-    this._buildQuality(qOpts, tier, onPickTier);
-    qRow.appendChild(qOpts);
-    this.el.settings.appendChild(qRow);
 
     const sRow = document.createElement('div');
     sRow.className = 'settings-row';

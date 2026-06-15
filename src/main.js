@@ -10,7 +10,7 @@ import Flashlight from './Flashlight.js';
 import Input from './Input.js';
 import PostFX from './PostFX.js';
 import UI from './UI.js';
-import { detectTier, getPreset, saveTier, isTouchDevice } from './Quality.js';
+import { getPreset, isTouchDevice } from './Quality.js';
 import { ASSET_URL } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -19,8 +19,7 @@ class Game {
   constructor() {
     this.ui = new UI();
     this.canvas = document.getElementById('scene');
-    this.tier = detectTier();
-    this.preset = getPreset(this.tier);
+    this.preset = getPreset(); // always Low — no quality selector
     this.touch = isTouchDevice();
     this.state = 'loading';
     this.statsOn = false;
@@ -67,11 +66,9 @@ class Game {
       this._setupPauseHooks();
 
       this.ui.showStart({
-        tier: this.tier,
         deviceHint: this.touch
           ? 'Touch detected — on-screen controls enabled.'
-          : `Detected ${this.preset.label} quality · auto-tunes to stay smooth.`,
-        onPickTier: (t) => this._pickTier(t),
+          : 'Optimized to run smoothly on any device.',
         onEnter: () => this._enter(),
       });
       this.state = 'menu';
@@ -80,12 +77,6 @@ class Game {
       console.error(err);
       this.ui.setStatus('Failed to load the house — see console.');
     }
-  }
-
-  _pickTier(t) {
-    if (t === this.tier) return;
-    saveTier(t);
-    location.reload();
   }
 
   _enter() {
@@ -122,9 +113,7 @@ class Game {
     if (this.touch) return;
     this.state = 'paused';
     this.ui.showPause({
-      tier: this.tier,
       statsOn: this.statsOn,
-      onPickTier: (t) => this._pickTier(t),
       onToggleStats: () => { this.statsOn = !this.statsOn; this.ui.setStatsVisible(this.statsOn); },
       onResume: () => { this.ui.hidePause(); this.state = 'playing'; this.input.requestLock(); },
     });
