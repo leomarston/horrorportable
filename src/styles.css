@@ -126,20 +126,23 @@ canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .book-counter b { color: #fff; font-weight: 800; }
 
-/* ---------- Objective ---------- */
-.objective {
-  position: absolute; top: 16px; left: 18px; max-width: 320px;
-  padding: 10px 14px; border-left: 2px solid #7c1f1f; background: rgba(8,9,12,.4);
-  text-shadow: 0 1px 3px #000; transition: opacity .6s ease;
+/* ---------- Objective (top-left; also the flown intro title) ---------- */
+.obj-title {
+  position: absolute; top: 18px; left: 26px; z-index: 32;
+  font-size: 1.55rem; font-weight: 800; letter-spacing: .06em; color: #ece2cd;
+  text-shadow: 0 2px 12px #000, 0 0 34px rgba(120,20,20,.45);
+  text-align: left; white-space: nowrap; transform-origin: center;
+  pointer-events: none; will-change: transform, opacity;
 }
-.obj-label {
-  font-size: .62rem; letter-spacing: .28em; text-transform: uppercase; color: #b06a6a; margin-bottom: 3px;
+.obj-title.done { color: #cfe6cd; }
+.obj-title.done::before { content: "✓ "; color: #6fcf7e; }
+.obj-title.done span { text-decoration: line-through; opacity: .85; }
+
+/* ---------- Opening fade-from-black ---------- */
+.intro-fade {
+  position: absolute; inset: 0; z-index: 30; background: #000; pointer-events: none;
+  opacity: 0; display: none;
 }
-.obj-text { font-size: .92rem; letter-spacing: .04em; color: #e6ddcc; }
-.objective.done { border-left-color: #4e9d5a; }
-.objective.done .obj-label { color: #5fb16d; }
-.objective.done .obj-text { color: #cfe6cd; text-decoration: line-through; }
-.objective.done .obj-text::before { content: "✓ "; color: #5fb16d; text-decoration: none; }
 
 .win-inner { position: relative; z-index: 2; text-align: center; padding: 6vmin; }
 .win-title { color: #cbb98a; text-shadow: 0 0 30px rgba(150,130,60,.5); }

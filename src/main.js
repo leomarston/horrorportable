@@ -13,7 +13,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -73,8 +73,9 @@ class Game {
       // Missions (more objectives will be added as the game grows).
       this.objIndex = 0;
       this._objCompleting = false;
+      this.intro = null;
       this.objectives = [
-        { text: 'Get inside the house', check: () => this._isInsideHouse() },
+        { label: 'Objective 1: Get in the house', check: () => this._isInsideHouse() },
       ];
 
       // Pre-compile shaders so the first movements don't hitch.
@@ -103,8 +104,28 @@ class Game {
     this.state = 'playing';              // play immediately — never gate on pointer-lock
     this.sfx.resume();                   // unlock WebAudio under this click gesture
     this.sfx.startAmbience(AUDIO.ambienceVolume);
-    if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].text);
+    // cinematic opening: fade up from black (movement locked) → big centred
+    // objective title → it flies to the top-left and stays there.
+    this.intro = { phase: 'fade', t: 0 };
+    this.ui.fadeShow();
     if (!this.touch) this.input.requestLock(); // best-effort mouse capture (ok if denied)
+  }
+
+  _updateIntro(dt) {
+    const I = this.intro;
+    I.t += dt;
+    if (I.phase === 'fade') {
+      this.ui.fadeSet(Math.max(0, 1 - I.t / INTRO.fade));
+      if (I.t >= INTRO.fade) {
+        this.ui.fadeHide();
+        this.ui.introTitle(this.objectives[this.objIndex].label); // big in the centre
+        I.phase = 'hold'; I.t = 0;
+      }
+    } else if (I.phase === 'hold') {
+      if (I.t >= INTRO.hold) { this.ui.flyObjectiveToCorner(); I.phase = 'settle'; I.t = 0; }
+    } else if (I.phase === 'settle') {
+      if (I.t >= INTRO.fly) this.intro = null; // objective now rests top-left
+    }
   }
 
   _isInsideHouse() {
@@ -267,6 +288,8 @@ class Game {
 
     if (this.state === 'playing') {
       this.input.update();
+      // movement is locked until the opening fade-in finishes (look still works)
+      if (this.intro && this.intro.phase === 'fade') { this.input.move.x = 0; this.input.move.y = 0; this.input.consumeEdge('jump'); }
       this.player.update(dt);
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);
@@ -278,7 +301,8 @@ class Game {
       this._footsteps(dt);
       this._laughs(dt);
       this._chaseMusic();
-      this._checkObjectives();
+      if (this.intro) this._updateIntro(dt);
+      else this._checkObjectives();
 
       if (this.input.consumeEdge('interact')) {
         if (this.doors.interact(this.engine.camera)) this.sfx.play('door', { volume: AUDIO.doorVolume });

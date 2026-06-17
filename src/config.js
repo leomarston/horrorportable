@@ -105,6 +105,10 @@ export const PICKUPS = {
 // i.e. not the yard at ~-1.3).
 export const INTERIOR = { minX: -56, maxX: -22, minZ: -137, maxZ: -116, floorAbove: -0.8 };
 
+// Opening cinematic timings (seconds): fade up from black, hold the centred
+// objective title, then fly it to the corner.
+export const INTRO = { fade: 2.5, hold: 1.9, fly: 0.95 };
+
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {
   jumpscare: './audio/jumpscare.mp3',
