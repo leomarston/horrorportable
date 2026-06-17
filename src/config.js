@@ -81,30 +81,41 @@ export const ATMOSPHERE = {
     penumbra: 0.55,
     decay: 1.1,
     startsOn: true,
-    drainPerSec: 0.0083,   // full charge lasts ~2 min of use
-    rechargeAmount: 0.5,   // a battery pickup restores this much
   },
   lampColor: 0xffb964,
   dustCount: 900,
 };
 
-// Collectibles. Gather all the books to win; batteries recharge your torch.
-// Each entry's Y is approximate — items are snapped to the floor at load
-// (the ray starts just above the given Y, so interior items skip the roof).
+// Collectibles. Gather all the papers to win; batteries recharge your torch.
+// Papers are scattered RANDOMLY across the house ground floor each game, lie
+// flat on the floor, and do NOT glow. Collect by E, walking over, or touching.
 export const PICKUPS = {
-  goal: 10,            // books needed to win
-  hoverHeight: 0.7,    // how far above the floor an item floats (units)
-  collectDist: 1.5,    // walk within this to collect (units)
-  books: [
-    { x: -51, y: -0.2, z: -124 }, { x: -47, y: -0.2, z: -124 }, { x: -43, y: -0.2, z: -123 },
-    { x: -40, y: -0.2, z: -126 }, { x: -36, y: -0.2, z: -124 }, { x: -33, y: -0.2, z: -124 },
-    { x: -30, y: -0.2, z: -124 }, { x: -50, y: -0.2, z: -128 }, { x: -44, y: -0.2, z: -129 },
-    { x: -34, y: -0.2, z: -130 },
-  ],
-  batteries: [
-    { x: -46, y: -0.2, z: -122 }, { x: -38, y: -0.2, z: -123 },
-    { x: -31, y: -0.2, z: -128 }, { x: -53, y: -0.2, z: -126 },
-  ],
+  goal: 10,                  // papers needed to win
+  paperUrl: './models/paper.glb',
+  paperSize: 0.42,           // sheet size in units
+  paperCount: 10,
+  paperArea: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 }, // house ground-floor interior
+  paperMinSep: 2.2,          // minimum spacing between papers (units)
+  touchDist: 1.05,           // auto-collect: walk over / almost touching
+  interactDist: 2.4,         // press E to collect a nearby paper
+};
+
+// Sound effects + music (loaded into Web Audio buffers at boot).
+export const AUDIO = {
+  jumpscare: './audio/jumpscare.mp3',
+  footstep: './audio/footstep.mp3',
+  door: './audio/door.mp3',
+  laugh: './audio/laugh.mp3',
+  ambience: './audio/ambience.mp3',
+  chase: './audio/chase.mp3',
+  footstepVolume: 0.28,
+  footstepStride: 0.95,      // distance (units) between footstep sounds
+  laughEvery: [9, 20],       // random seconds between the monster's laughs
+  laughVolume: 0.7,
+  doorVolume: 0.7,
+  jumpscareVolume: 1.0,
+  ambienceVolume: 0.32,      // looping background music
+  chaseVolume: 0.55,         // looping chase music (starts on chase, stops on give-up)
 };
 
 /**
@@ -190,6 +201,8 @@ export const MONSTER = {
   catchDist: 1.4,
   avoidDist: 2.4,
   losHeight: 1.35,           // eye height for line-of-sight rays (clears low furniture, blocked by walls)
+  giveUpPathDist: 16,        // gives up if the WALKABLE path to you grows beyond this (units)
+  navCell: 1.2,              // nav-grid cell size for path-distance checks
 
   // --- vaulting low obstacles (e.g. a table) ---
   jumpDist: 2.5,             // how far ahead it lands

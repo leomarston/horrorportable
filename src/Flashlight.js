@@ -10,7 +10,6 @@ export default class Flashlight {
   constructor(scene, preset) {
     const f = ATMOSPHERE.flashlight;
     this.on = f.startsOn;
-    this.battery = 1.0; // 0..1
     this._cfg = f;
 
     this.spot = new THREE.SpotLight(f.color, f.intensity, f.distance, f.angle, f.penumbra, f.decay);
@@ -41,13 +40,8 @@ export default class Flashlight {
   }
 
   toggle() {
-    if (!this.on && this.battery <= 0) return; // can't switch on a dead torch
     this.on = !this.on;
     this.spot.visible = this.on;
-  }
-
-  recharge(amount) {
-    this.battery = Math.min(1, this.battery + amount);
   }
 
   update(dt, camera) {
@@ -75,19 +69,10 @@ export default class Flashlight {
     this.spot.target.position.copy(this._smoothTarget);
     this.spot.target.updateMatrixWorld();
 
-    // drain the battery while lit; cut out when empty
+    // subtle handheld flicker (unlimited torch — no battery)
     if (this.on) {
-      this.battery = Math.max(0, this.battery - this._cfg.drainPerSec * dt);
-      if (this.battery <= 0) { this.on = false; this.spot.visible = false; }
-    }
-
-    // flicker — gets worse as the battery dies
-    if (this.on) {
-      const low = this.battery < 0.25 ? (0.25 - this.battery) * 4 : 0; // 0..1 near empty
       const n = Math.sin(this.t * 31) * 0.5 + Math.sin(this.t * 11.3) * 0.5;
-      const dip = low > 0 && Math.sin(this.t * 22) > 1 - low * 0.6 ? 0.35 : 1; // stutter when low
-      const dim = 0.55 + 0.45 * this.battery; // dims as it drains
-      this.spot.intensity = this._cfg.intensity * dim * dip * (0.92 + 0.08 * (n * 0.5 + 0.5));
+      this.spot.intensity = this._cfg.intensity * (0.92 + 0.08 * (n * 0.5 + 0.5));
     }
   }
 }

@@ -11,8 +11,9 @@ import Flashlight from './Flashlight.js';
 import Input from './Input.js';
 import PostFX from './PostFX.js';
 import UI from './UI.js';
+import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -34,6 +35,8 @@ class Game {
     try {
       this.engine = new Engine(this.canvas, this.preset);
       this.input = new Input(this.canvas);
+      this.sfx = new Sfx().init();
+      this.sfx.loadAll();              // decode mp3s in the background
 
       this.ui.setStatus('summoning the house…');
       const gltf = await loadWorld(ASSET_URL, (p) => this.ui.setProgress(p * 0.9));
@@ -60,12 +63,12 @@ class Game {
       this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
       this.monster.onCaught = () => this._jumpscare();
 
-      this.bookCount = 0;
-      this.pickups = new Pickups(this.engine.scene, this.world.collider, this.player, this.flashlight, {
-        onBook: () => this._onBook(),
-        onBattery: () => this._onBattery(),
+      this.paperCount = 0;
+      const paperGltf = await Pickups.loadPaper();
+      this.pickups = new Pickups(this.engine.scene, this.world.collider, this.player, paperGltf, {
+        onPaper: () => this._onPaper(),
       });
-      this.ui.setBooks(0, this.pickups.bookTotal);
+      this.ui.setBooks(0, this.pickups.total);
 
       // Pre-compile shaders so the first movements don't hitch.
       this.engine.renderer.compile(this.engine.scene, this.engine.camera);
@@ -91,13 +94,9 @@ class Game {
   _enter() {
     this.ui.enterGame();
     this.state = 'playing';              // play immediately — never gate on pointer-lock
-    this._initAudio();                   // unlock WebAudio under this click gesture
+    this.sfx.resume();                   // unlock WebAudio under this click gesture
+    this.sfx.startAmbience(AUDIO.ambienceVolume);
     if (!this.touch) this.input.requestLock(); // best-effort mouse capture (ok if denied)
-  }
-
-  _initAudio() {
-    if (this.audio) { if (this.audio.state === 'suspended') this.audio.resume(); return; }
-    try { this.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.audio = null; }
   }
 
   // ---------------- jumpscare ----------------
@@ -106,10 +105,12 @@ class Game {
     this.state = 'scare';
     this.scareT = 0;
     this._deathShown = false;
+    this._chasing = false;
+    this.sfx.stopChase();
     if (this.input.locked) this.input.exitLock();
     this.monster.attackPose();   // play the Attack clip
     this.ui.showScare();
-    this._screech();
+    this.sfx.play('jumpscare', { volume: AUDIO.jumpscareVolume });
   }
 
   _scareFrame(dt) {
@@ -145,66 +146,52 @@ class Game {
     if (!this.touch) this.input.requestLock();
   }
 
-  /** Synthesised screech stinger (no audio asset needed). */
-  _screech() {
-    const ac = this.audio;
-    if (!ac) return;
-    if (ac.state === 'suspended') ac.resume();
-    const now = ac.currentTime;
-    const master = ac.createGain();
-    master.gain.value = 0.9; master.connect(ac.destination);
-
-    const dur = 1.3;
-    const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.4);
-    const noise = ac.createBufferSource(); noise.buffer = buf;
-    const ng = ac.createGain(); ng.gain.value = 0.5;
-    noise.connect(ng); ng.connect(master); noise.start(now);
-
-    const tg = ac.createGain();
-    tg.gain.setValueAtTime(0.0001, now);
-    tg.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
-    tg.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
-    tg.connect(master);
-    for (const f of [98, 104, 207, 660]) {
-      const o = ac.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(f * 2.2, now);
-      o.frequency.exponentialRampToValueAtTime(f, now + 0.9);
-      o.connect(tg); o.start(now); o.stop(now + 1.15);
-    }
-  }
-
   // ---------------- pickups / win ----------------
-  _onBook() {
-    this.bookCount++;
-    this.ui.setBooks(this.bookCount, this.pickups.bookTotal);
-    this._blip(880);
-    if (this.bookCount >= this.pickups.bookTotal) this._win();
+  _onPaper() {
+    this.paperCount++;
+    this.ui.setBooks(this.paperCount, this.pickups.total);
+    this.sfx.blip(880);
+    if (this.paperCount >= this.pickups.total) this._win();
   }
-
-  _onBattery() { this._blip(420); }
 
   _win() {
     if (this.state === 'win') return;
     this.state = 'win';
+    this._chasing = false;
+    this.sfx.stopChase();
     if (this.input.locked) this.input.exitLock();
     this.ui.showWin(() => location.reload());
   }
 
-  _blip(freq) {
-    const ac = this.audio; if (!ac) return;
-    if (ac.state === 'suspended') ac.resume();
-    const now = ac.currentTime;
-    const o = ac.createOscillator(); const g = ac.createGain();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(freq, now);
-    o.frequency.exponentialRampToValueAtTime(freq * 1.6, now + 0.08);
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-    o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now + 0.2);
+  // a footstep sound every stride of horizontal movement on the ground
+  _footsteps(dt) {
+    const sh = Math.hypot(this.player.velocity.x, this.player.velocity.z);
+    if (this.player.onGround && sh > 0.6) {
+      this._stepAccum = (this._stepAccum || 0) + sh * dt;
+      if (this._stepAccum >= AUDIO.footstepStride) {
+        this._stepAccum = 0;
+        this.sfx.play('footstep', { volume: AUDIO.footstepVolume, rate: 0.92 + Math.random() * 0.16 });
+      }
+    } else {
+      this._stepAccum = AUDIO.footstepStride; // so the first step plays as soon as you move
+    }
+  }
+
+  // the monster laughs from its position at random intervals
+  _laughs(dt) {
+    this._laughCd = (this._laughCd ?? (AUDIO.laughEvery[0] * 0.6)) - dt;
+    if (this._laughCd <= 0) {
+      this.sfx.play('laugh', { volume: AUDIO.laughVolume, pos: this.monster.root.position });
+      this._laughCd = AUDIO.laughEvery[0] + Math.random() * (AUDIO.laughEvery[1] - AUDIO.laughEvery[0]);
+    }
+  }
+
+  // chase music loops while the monster is hunting; stops when it gives up
+  _chaseMusic() {
+    const chasing = this.monster.state === 'chase';
+    if (chasing && !this._chasing) this.sfx.startChase(AUDIO.chaseVolume);
+    else if (!chasing && this._chasing) this.sfx.stopChase();
+    this._chasing = chasing;
   }
 
   _setupTouch() {
@@ -255,8 +242,17 @@ class Game {
       this.world.update(dt, this.player.position);
       this.monster.update(dt);
       this.pickups.update(dt);
-      this.ui.setBattery(this.flashlight.battery);
-      if (this.input.consumeEdge('interact')) this.doors.interact(this.engine.camera);
+
+      this.sfx.setListener(this.engine.camera);
+      this.sfx.startAmbience(AUDIO.ambienceVolume); // starts once the buffer is ready
+      this._footsteps(dt);
+      this._laughs(dt);
+      this._chaseMusic();
+
+      if (this.input.consumeEdge('interact')) {
+        if (this.doors.interact(this.engine.camera)) this.sfx.play('door', { volume: AUDIO.doorVolume });
+        this.pickups.tryInteract();
+      }
       this.doors.update(dt, this.engine.camera, (txt) => this.ui.setPrompt(txt));
       if (this.input.consumeEdge('pause')) {
         if (this.input.locked) this.input.exitLock(); // pointerlockchange → pause

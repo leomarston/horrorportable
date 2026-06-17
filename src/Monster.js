@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { MONSTER } from './config.js';
+import Nav from './Nav.js';
 
 /**
  * The Momo monster. Uses the model's own baked clips:
@@ -63,6 +64,8 @@ export default class Monster {
     this.speed = 0; this.t = 0; this.pauseLeft = 1.0;
     this.state = 'wander'; this.lastSeen = new THREE.Vector3(); this.loseTimer = 0; this.onCaught = null; this._avoidSide = 0;
     this.jump = null; this._jumpCdUntil = 0;
+    this.nav = new Nav(collider, MONSTER.roam, MONSTER.navCell); // for walkable-distance give-up
+    this._pathT = 0;
 
     const sp = this._pickSpawn();              // random spot somewhere in the house
     this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
@@ -228,8 +231,20 @@ export default class Monster {
     if (this.state === 'caught') { this.speed = 0; this.mixer.update(dt); this._applyTransform(); return; }
 
     const see = this._canSee();
-    if (see) { this.lastSeen.copy(this.player.position); this.loseTimer = 0; if (this.state !== 'chase') this.state = 'chase'; }
-    else if (this.state === 'chase') { this.loseTimer += dt; if (this.loseTimer > MONSTER.loseTime) this.state = 'wander'; }
+    if (see) {
+      this.lastSeen.copy(this.player.position); this.loseTimer = 0;
+      if (this.state !== 'chase') this.state = 'chase';
+    } else if (this.state === 'chase') {
+      this.loseTimer += dt;
+      // give up if the WALKABLE route to the player has grown too long (checked ~3x/s)
+      this._pathT -= dt;
+      if (this._pathT <= 0) {
+        this._pathT = 0.35;
+        const pd = this.nav.pathDist(this.pos.x, this.pos.z, this.player.position.x, this.player.position.z);
+        if (pd > MONSTER.giveUpPathDist) this.state = 'wander';
+      }
+      if (this.state === 'chase' && this.loseTimer > MONSTER.loseTime) this.state = 'wander';
+    }
 
     if (this.state === 'chase') this._chase(dt); else this._wander(dt);
 

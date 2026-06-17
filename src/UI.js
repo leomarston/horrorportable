@@ -8,12 +8,11 @@ export default class UI {
       pause: $('pause'), resumeBtn: $('resume-btn'), settings: $('settings'),
       hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
-      bookCount: $('book-count'), bookGoal: $('book-goal'), batteryFill: $('battery-fill'),
+      bookCount: $('book-count'), bookGoal: $('book-goal'),
       win: $('win'), winAgain: $('win-again'),
       scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
     };
     this._promptText = null;
-    this._batLevel = -1;
   }
 
   showScare() {
@@ -28,14 +27,6 @@ export default class UI {
   setBooks(n, goal) {
     this.el.bookCount.textContent = n;
     this.el.bookGoal.textContent = goal;
-  }
-
-  setBattery(level) {
-    const p = Math.round(Math.max(0, Math.min(1, level)) * 100);
-    if (p === this._batLevel) return;
-    this._batLevel = p;
-    this.el.batteryFill.style.width = p + '%';
-    this.el.batteryFill.style.background = p > 40 ? '#6ad07a' : p > 15 ? '#d6c24a' : '#cf4a3a';
   }
 
   showWin(onAgain) {
