@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { MONSTER } from './config.js';
+import { MONSTER, INTERIOR } from './config.js';
 import Nav from './Nav.js';
 
 /**
@@ -211,6 +211,15 @@ export default class Monster {
     else this.target.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
   }
 
+  /** Is the player currently inside the house? (interior footprint + ground floor) */
+  _playerInside() {
+    const p = this.player.position;
+    const i = INTERIOR;
+    if (p.x < i.minX || p.x > i.maxX || p.z < i.minZ || p.z > i.maxZ) return false;
+    const floor = this.collider.groundY(p.x, p.z, p.y + 0.3);
+    return floor != null && floor > i.floorAbove;
+  }
+
   _canSee() {
     const p = this.player.position;
     const dx = p.x - this.pos.x, dz = p.z - this.pos.z;
@@ -234,20 +243,26 @@ export default class Monster {
     }
     if (this.state === 'caught') { this.speed = 0; this.mixer.update(dt); this._applyTransform(); return; }
 
-    const see = this._canSee();
+    // The monster only hunts while you're inside the house: leave, and it drops the chase.
+    const inside = this._playerInside();
+    const see = inside && this._canSee();
     if (see) {
       this.lastSeen.copy(this.player.position); this.loseTimer = 0;
       if (this.state !== 'chase') this.state = 'chase';
     } else if (this.state === 'chase') {
-      this.loseTimer += dt;
-      // give up if the WALKABLE route to the player has grown too long (checked ~3x/s)
-      this._pathT -= dt;
-      if (this._pathT <= 0) {
-        this._pathT = 0.35;
-        const pd = this.nav.pathDist(this.pos.x, this.pos.z, this.player.position.x, this.player.position.z);
-        if (pd > MONSTER.giveUpPathDist) this.state = 'wander';
+      if (!inside) {
+        this.state = 'wander';                  // stepped outside → give up immediately
+      } else {
+        this.loseTimer += dt;
+        // give up if the WALKABLE route to the player has grown too long (checked ~3x/s)
+        this._pathT -= dt;
+        if (this._pathT <= 0) {
+          this._pathT = 0.35;
+          const pd = this.nav.pathDist(this.pos.x, this.pos.z, this.player.position.x, this.player.position.z);
+          if (pd > MONSTER.giveUpPathDist) this.state = 'wander';
+        }
+        if (this.state === 'chase' && this.loseTimer > MONSTER.loseTime) this.state = 'wander';
       }
-      if (this.state === 'chase' && this.loseTimer > MONSTER.loseTime) this.state = 'wander';
     }
 
     if (this.state === 'chase') this._chase(dt); else this._wander(dt);
