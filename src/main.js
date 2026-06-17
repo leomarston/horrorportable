@@ -14,7 +14,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -80,9 +80,17 @@ class Game {
       this._objCompleting = false;
       this.intro = null;
       this.trapSprung = false;             // front door slams + locks at the stairs (once)
+      // Objective 1 is NOT completed merely by entering — it completes when the
+      // stairs trap springs (the door slams + locks). Hence check: () => false.
       this.objectives = [
-        { label: 'Objective 1: Get in the house', check: () => this._isInsideHouse() },
+        { label: 'Objective 1: Get in the house', check: () => false },
       ];
+      this.currentObjective = this.objectives[0].label; // re-shown after a night transition
+
+      // 3 nights: getting caught costs a night and you wake in the attic; lose all 3 → game over.
+      this.night = 1;
+      this.nightCardLock = false;
+      this.atticSpawn = new THREE.Vector3(NIGHTS.attic.x, NIGHTS.attic.y, NIGHTS.attic.z);
 
       // Pre-compile shaders so the first movements don't hitch.
       this.engine.renderer.compile(this.engine.scene, this.engine.camera);
@@ -150,8 +158,13 @@ class Game {
       setTimeout(() => {
         this._objCompleting = false;
         this.objIndex++;
-        if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].label);
-        else this.ui.hideObjective();
+        if (this.objIndex < this.objectives.length) {
+          this.currentObjective = this.objectives[this.objIndex].label;
+          this.ui.setObjective(this.currentObjective);
+        } else {
+          this.currentObjective = null;   // no active objective until the stairs trap sets one
+          this.ui.hideObjective();
+        }
       }, 2200);
     }
   }
@@ -168,7 +181,14 @@ class Game {
     this.trapSprung = true;
     this.doors.lockShut();                                       // slam + lock the way out
     this.sfx.play('door', { volume: AUDIO.doorVolume, rate: 0.82 }); // heavy slam
-    this.ui.setObjective('Objective 2: Find a way out');
+    // the trap is what completes "Get in the house" → tick it off, then reveal obj 2
+    this.objIndex = 1;
+    this.ui.completeObjective();
+    this.currentObjective = 'Objective 2: You need the key, find the safe';
+    if (this._obj2Timer) clearTimeout(this._obj2Timer);
+    this._obj2Timer = setTimeout(() => {
+      if (this.state !== 'gameover' && !this.nightCardLock) this.ui.setObjective(this.currentObjective);
+    }, 2200);
   }
 
   // ---------------- jumpscare ----------------
@@ -205,17 +225,37 @@ class Game {
     this.flashlight.update(dt, cam);
 
     if (this.scareT > 1.2 && !this._deathShown) { this._deathShown = true; this.ui.showDeath(); }
-    if (this.scareT > 3.4) this._respawn();
+    if (this.scareT > 3.4) this._loseNight();
   }
 
-  _respawn() {
+  // Caught → lose a night. If nights remain, wake in the attic with a bloody
+  // "NIGHT n" card, then the current objective. Lose the 3rd night → game over.
+  _loseNight() {
+    if (this.night >= NIGHTS.total) { this._gameOver(); return; }
+    this.night++;
     this.ui.hideScare();
+    this.ui.hideObjective();
     this.engine.camera.rotation.z = 0;
-    this.player.spawn(this.world.spawnPoint, this.world.spawnYaw, this.world.spawnPitch);
+    this.player.spawn(this.atticSpawn, NIGHTS.attic.yaw, NIGHTS.attic.pitch); // wake in the attic bedroom
     this.player._applyCamera(0);
     this.monster.reset();
     this.state = 'playing';
+    this.nightCardLock = true;                 // hold the player still while the card shows
+    this.ui.showNight(this.night, { fade: NIGHTS.cardFade, hold: NIGHTS.cardHold, out: NIGHTS.cardOut }, () => {
+      this.nightCardLock = false;
+      if (this.currentObjective) this.ui.setObjective(this.currentObjective); // the current objective again
+    });
     if (!this.touch) this.input.requestLock();
+  }
+
+  _gameOver() {
+    if (this.state === 'gameover') return;
+    this.state = 'gameover';
+    this._chasing = false;
+    this.sfx.stopChase();
+    this.ui.hideScare();
+    if (this.input.locked) this.input.exitLock();
+    this.ui.showGameOver();
   }
 
   // ---------------- pickups / win ----------------
@@ -309,8 +349,8 @@ class Game {
 
     if (this.state === 'playing') {
       this.input.update();
-      // movement is locked until the opening fade-in finishes (look still works)
-      if (this.intro && this.intro.phase === 'fade') { this.input.move.x = 0; this.input.move.y = 0; this.input.consumeEdge('jump'); }
+      // movement is locked during the opening fade-in and the night-transition card (look still works)
+      if (this.nightCardLock || (this.intro && this.intro.phase === 'fade')) { this.input.move.x = 0; this.input.move.y = 0; this.input.consumeEdge('jump'); }
       this.player.update(dt);
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);

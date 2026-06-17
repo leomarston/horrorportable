@@ -12,9 +12,30 @@ export default class UI {
       win: $('win'), winAgain: $('win-again'),
       scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
       objTitle: $('obj-title'), introFade: $('intro-fade'),
+      nightCard: $('night-card'), nightText: $('night-text'), gameover: $('gameover'),
     };
     this._promptText = null;
   }
+
+  // ---- bloody night-transition card; calls onDone once it has faded back out ----
+  showNight(n, { fade, hold, out }, onDone) {
+    const el = this.el.nightCard;
+    this.el.nightText.textContent = `NIGHT ${n}`;
+    el.classList.remove('hidden');
+    el.style.transition = `opacity ${fade}s ease`;
+    el.style.opacity = '0';
+    void el.offsetWidth;                 // reflow so the fade-in actually plays
+    el.style.opacity = '1';
+    if (this._nightT1) clearTimeout(this._nightT1);
+    if (this._nightT2) clearTimeout(this._nightT2);
+    this._nightT1 = setTimeout(() => {
+      el.style.transition = `opacity ${out}s ease`;
+      el.style.opacity = '0';
+      this._nightT2 = setTimeout(() => { el.classList.add('hidden'); if (onDone) onDone(); }, out * 1000);
+    }, (fade + hold) * 1000);
+  }
+
+  showGameOver() { this.el.gameover.classList.remove('hidden'); }
 
   // ---- opening fade-from-black ----
   fadeShow() { this.el.introFade.style.display = 'block'; this.el.introFade.style.opacity = '1'; }

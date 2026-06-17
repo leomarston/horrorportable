@@ -28,6 +28,9 @@
       <!-- Opening fade-from-black -->
       <div id="intro-fade" class="intro-fade"></div>
 
+      <!-- Night transition (bloody) -->
+      <div id="night-card" class="night-card hidden"><span id="night-text">NIGHT 2</span></div>
+
       <!-- Loading -->
       <div id="loading" class="overlay">
         <div class="vignette"></div>
@@ -81,6 +84,15 @@
       <div id="scare" class="scare hidden">
         <div id="scare-flash" class="scare-flash"></div>
         <div id="scare-text" class="scare-text hidden">IT&nbsp;FOUND&nbsp;YOU</div>
+      </div>
+
+      <!-- Game over (all nights lost) -->
+      <div id="gameover" class="overlay hidden">
+        <div class="vignette"></div>
+        <div class="win-inner">
+          <h1 class="title gameover-title">GAME&nbsp;OVER</h1>
+          <p class="subtitle">the house kept you · three nights gone</p>
+        </div>
       </div>
 
       <!-- Win -->

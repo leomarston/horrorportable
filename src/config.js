@@ -127,6 +127,18 @@ export const STAIRS = { x: -31, z: -126.5, triggerRadius: 4.5 };
 // objective title, then fly it to the corner.
 export const INTRO = { fade: 2.5, hold: 1.9, fly: 0.95 };
 
+// You get 3 nights to beat the game. Getting caught costs a night; you wake on
+// the next night in the attic (upper floor). Lose all 3 nights → game over.
+// `attic` is the eye-position spawn (floor 3.87 + standing height); facing the
+// bedroom doorway toward the rest of the upper floor.
+export const NIGHTS = {
+  total: 3,
+  attic: { x: -32, y: 5.77, z: -121, yaw: Math.PI * 0.5, pitch: -0.02 }, // inside the attic bedroom (faces the bed)
+  cardFade: 0.6,  // night-card fade-in (s)
+  cardHold: 1.9,  // night-card hold (s)
+  cardOut: 0.8,   // night-card fade-out (s)
+};
+
 // The interactive animated safe. Uses its baked "SafeOpen" clip, scrubbed
 // forward to open and backward to close on each interaction. Placed (for now)
 // on the kitchen counter so it's easy to test.
