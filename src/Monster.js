@@ -137,6 +137,8 @@ export default class Monster {
     if (this._rayHit(this.heading, this.halfWidth + adv + 0.12)) { this.speed = 0; return false; }
     const nx = this.pos.x + Math.sin(this.heading) * adv;
     const nz = this.pos.z + Math.cos(this.heading) * adv;
+    const r = MONSTER.roam;
+    if (nx < r.minX || nx > r.maxX || nz < r.minZ || nz > r.maxZ) { this.speed = 0; return false; } // never leave the house
     const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
     if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; } // void / big drop
     if (fy - this.feetY > 0.6) { this.speed = 0; return false; }                    // too tall to step up
@@ -161,6 +163,8 @@ export default class Monster {
     const jd = MONSTER.jumpDist;
     const lx = this.pos.x + Math.sin(heading) * jd;
     const lz = this.pos.z + Math.cos(heading) * jd;
+    const r = MONSTER.roam;
+    if (lx < r.minX || lx > r.maxX || lz < r.minZ || lz > r.maxZ) return false; // don't jump out of the house
     const landingY = this.collider.groundY(lx, lz, this.feetY + MONSTER.floorScan);
     if (landingY == null || landingY < this.feetY - 1.5 || landingY > this.feetY + 1.0) return false; // no/odd landing
     // must be a LOW obstacle: a ray at clear-height ahead must be unobstructed
