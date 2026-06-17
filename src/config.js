@@ -110,7 +110,7 @@ export const AUDIO = {
   chase: './audio/chase.mp3',
   footstepVolume: 0.28,
   footstepStride: 0.95,      // distance (units) between footstep sounds
-  laughEvery: [9, 20],       // random seconds between the monster's laughs
+  laughEvery: [30, 70],      // random seconds between the monster's laughs (rare)
   laughVolume: 0.7,
   doorVolume: 0.7,
   jumpscareVolume: 1.0,
