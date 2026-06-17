@@ -114,6 +114,18 @@ export const STAIRS = { x: -31, z: -126.5, triggerRadius: 4.5 };
 // objective title, then fly it to the corner.
 export const INTRO = { fade: 2.5, hold: 1.9, fly: 0.95 };
 
+// The interactive animated safe. Uses its baked "SafeOpen" clip, scrubbed
+// forward to open and backward to close on each interaction. Placed (for now)
+// on the kitchen counter so it's easy to test.
+export const SAFE = {
+  url: './models/safe.glb',
+  height: 0.6,                 // target height in units (a small tabletop safe)
+  x: -34.25, y: 0.98, z: -130.2, // sitting on the kitchen counter top
+  yaw: -Math.PI / 2,           // face the door toward the player's approach side
+  range: 3.2,                  // how close you must look at it to interact (units)
+  openRate: 1.0,               // animation playback speed (×)
+};
+
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {
   jumpscare: './audio/jumpscare.mp3',

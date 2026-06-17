@@ -5,6 +5,7 @@ import { loadWorld } from './AssetLoader.js';
 import World from './World.js';
 import Player from './Player.js';
 import Doors from './Doors.js';
+import Safe from './Safe.js';
 import Monster from './Monster.js';
 import Pickups from './Pickups.js';
 import Flashlight from './Flashlight.js';
@@ -13,7 +14,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -57,6 +58,10 @@ class Game {
 
       this.doors = new Doors(this.engine.scene, this.engine.camera);
       this.player.extraColliders = this.doors.colliders;
+
+      const safeGltf = await Safe.load();
+      this.safe = new Safe(this.engine.scene, this.engine.camera, safeGltf);
+      this.safe.place(SAFE.x, SAFE.y, SAFE.z, SAFE.yaw); // on the kitchen counter (for now)
 
       this.ui.setStatus('something stirs inside…');
       const monsterGltf = await Monster.load();
@@ -311,6 +316,7 @@ class Game {
       this.world.update(dt, this.player.position);
       this.monster.update(dt);
       this.pickups.update(dt);
+      this.safe.update(dt);
 
       this.sfx.setListener(this.engine.camera);
       this.sfx.startAmbience(AUDIO.ambienceVolume); // starts once the buffer is ready
@@ -326,9 +332,17 @@ class Game {
         const door = this.doors.interact(this.engine.camera);
         if (door === 'toggled') this.sfx.play('door', { volume: AUDIO.doorVolume });
         else if (door === 'locked') this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
+        else if (this.safe.targeted()) {
+          const opened = this.safe.interact();
+          this.sfx.play('door', { volume: AUDIO.doorVolume * 0.7, rate: opened ? 0.95 : 1.15 });
+        }
         this.pickups.tryInteract();
       }
-      this.doors.update(dt, this.engine.camera, (txt) => this.ui.setPrompt(txt));
+      // door prompt first; if none, offer the safe prompt when it's in view
+      let prompt = null;
+      this.doors.update(dt, this.engine.camera, (txt) => { prompt = txt; });
+      if (!prompt && this.safe.targeted()) prompt = this.safe.open ? 'Close safe' : 'Open safe';
+      this.ui.setPrompt(prompt);
       if (this.input.consumeEdge('pause')) {
         if (this.input.locked) this.input.exitLock(); // pointerlockchange → pause
         else this._pause();                            // no lock: pause directly
