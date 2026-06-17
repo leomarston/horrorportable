@@ -147,6 +147,8 @@ canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
 .win-inner { position: relative; z-index: 2; text-align: center; padding: 6vmin; }
 .win-title { color: #cbb98a; text-shadow: 0 0 30px rgba(150,130,60,.5); }
 .gameover-title { color: #8d1414; text-shadow: 0 0 34px rgba(140,20,20,.7), 0 0 80px rgba(120,10,10,.4); }
+.killed-overlay { z-index: 38; }   /* above the darkening fade (z 30) */
+.killed-title { color: #c9b88a; font-size: clamp(1.4rem, 5.2vw, 3rem); text-shadow: 0 0 30px rgba(150,130,60,.5), 0 0 70px rgba(120,20,20,.3); }
 
 /* ---------- Night transition card (bloody) ---------- */
 .night-card {

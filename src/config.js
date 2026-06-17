@@ -140,8 +140,8 @@ export const NIGHTS = {
 };
 
 // The interactive animated safe. Uses its baked "SafeOpen" clip, scrubbed
-// forward to open and backward to close on each interaction. Placed (for now)
-// on the kitchen counter so it's easy to test.
+// forward to open and backward to close. Once opened it freezes (no more
+// interaction) so you can't accidentally close it instead of taking the gun.
 export const SAFE = {
   url: './models/safe.glb',
   height: 0.6,                 // target height in units (a small tabletop safe)
@@ -149,6 +149,25 @@ export const SAFE = {
   yaw: -Math.PI / 2,           // face the door toward the player's approach side
   range: 3.2,                  // how close you must look at it to interact (units)
   openRate: 1.0,               // animation playback speed (×)
+};
+
+// The Colt M1911 — sits inside the safe once opened; taken with E to equip as a
+// first-person viewmodel you can fire. Skinned 'Fire' clip is kept but unused.
+export const GUN = {
+  url: './models/gun.glb',
+  viewScale: 0.008,            // held viewmodel scale (asset is ~46u long)
+  viewPos: { x: 0.15, y: -0.2, z: -0.32 },    // local to camera: right, down, forward(-Z)
+  viewRot: { x: 0, y: -Math.PI / 2, z: 0 },   // muzzle (model -X) → -Z (forward)
+  safeScale: 0.011,            // gun lying in the open safe
+  safePos: { x: -34.85, y: 1.0, z: -130.2 },    // on the counter just in front of the open door
+  safeRot: { x: Math.PI / 2, y: 0, z: 0 },      // laid flat on the counter, side profile up
+  recoilKick: 0.05,            // backward kick distance (units)
+  recoilRise: 0.16,            // muzzle-up rotation on fire (rad)
+  recoilRecover: 9,            // recovery rate
+  range: 70,                   // hitscan range (units)
+  hitRadius: 1.1,              // monster hit sphere radius (units)
+  flashTime: 0.045,            // muzzle-flash duration (s)
+  takeDist: 3.4,               // how close you must be to the safe to take the gun
 };
 
 // Sound effects + music (loaded into Web Audio buffers at boot).

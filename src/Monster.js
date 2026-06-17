@@ -63,6 +63,7 @@ export default class Monster {
     this._ray = new THREE.Raycaster(); this._ray.firstHitOnly = true; this._tmp = new THREE.Vector3();
     this.speed = 0; this.t = 0; this.pauseLeft = 1.0;
     this.state = 'wander'; this.lastSeen = new THREE.Vector3(); this.loseTimer = 0; this.onCaught = null; this._avoidSide = 0;
+    this.relentless = false; // once true (gun taken), it never gives up the chase
     this.jump = null; this._jumpCdUntil = 0;
     this.nav = new Nav(collider, MONSTER.roam, MONSTER.navCell); // for walkable-distance give-up
     this._pathT = 0;
@@ -241,15 +242,16 @@ export default class Monster {
       if (this.walk) { this.walk.timeScale = this.state === 'chase' ? MONSTER.runAnimSpeed : 1; this._play(this.walk, 0.1); }
       this.mixer.update(dt); this._applyTransform(); return;
     }
-    if (this.state === 'caught') { this.speed = 0; this.mixer.update(dt); this._applyTransform(); return; }
+    if (this.state === 'caught' || this.state === 'dead') { this.speed = 0; this.mixer.update(dt); this._applyTransform(); return; }
 
-    // The monster only hunts while you're inside the house: leave, and it drops the chase.
+    // The monster only hunts while you're inside the house: leave, and it drops the
+    // chase — UNLESS it's gone relentless (after you take the gun), then it never stops.
     const inside = this._playerInside();
-    const see = inside && this._canSee();
+    const see = (inside || this.relentless) && this._canSee();
     if (see) {
       this.lastSeen.copy(this.player.position); this.loseTimer = 0;
       if (this.state !== 'chase') this.state = 'chase';
-    } else if (this.state === 'chase') {
+    } else if (this.state === 'chase' && !this.relentless) {
       if (!inside) {
         this.state = 'wander';                  // stepped outside → give up immediately
       } else {
@@ -318,6 +320,13 @@ export default class Monster {
     this.speed = THREE.MathUtils.damp(this.speed, want, 6, dt);
     if (this._advance(dt, 0.6)) this._stuckT = 0;
     else if (!this._tryJump(this.heading)) { this._stuckT = (this._stuckT || 0) + dt; if (this._stuckT > 0.7) { this._stuckT = 0; this._newTarget(); } }
+  }
+
+  /** Shot dead: stop, hide the body (the game spawns the explosion). */
+  kill() {
+    this.state = 'dead';
+    this.speed = 0;
+    this.model.visible = false;
   }
 
   reset() {

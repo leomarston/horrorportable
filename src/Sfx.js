@@ -71,6 +71,25 @@ export default class Sfx {
     src.start();
   }
 
+  // Synthesised gunshot: a sharp filtered noise crack with a low thump.
+  gun() {
+    if (!this.ctx) return;
+    this.resume();
+    const ctx = this.ctx, now = ctx.currentTime, dur = 0.22;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) { const t = i / d.length; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3); }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+    const g = ctx.createGain(); g.gain.value = 0.55;
+    src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start(now);
+    // low thump
+    const o = ctx.createOscillator(); const og = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(160, now); o.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+    og.gain.setValueAtTime(0.5, now); og.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    o.connect(og); og.connect(ctx.destination); o.start(now); o.stop(now + 0.2);
+  }
+
   // Short synthesised confirm blip for pickups (no asset needed).
   blip(freq) {
     if (!this.ctx) return;

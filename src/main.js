@@ -6,6 +6,7 @@ import World from './World.js';
 import Player from './Player.js';
 import Doors from './Doors.js';
 import Safe from './Safe.js';
+import Gun from './Gun.js';
 import Monster from './Monster.js';
 import Pickups from './Pickups.js';
 import Flashlight from './Flashlight.js';
@@ -14,7 +15,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -62,6 +63,10 @@ class Game {
       const safeGltf = await Safe.load();
       this.safe = new Safe(this.engine.scene, this.engine.camera, safeGltf);
       this.safe.place(SAFE.x, SAFE.y, SAFE.z, SAFE.yaw); // on the kitchen counter (for now)
+
+      const gunGltf = await Gun.load();
+      this.gun = new Gun(this.engine.scene, this.engine.camera, gunGltf);
+      this.gunTaken = false;        // becomes true once the player takes it from the safe
 
       this.ui.setStatus('something stirs inside…');
       const monsterGltf = await Monster.load();
@@ -297,12 +302,118 @@ class Game {
     }, 2200);
   }
 
-  // Opening the unlocked safe completes Objective 4.
+  // Opening the unlocked safe completes Objective 4: the gun appears inside, the
+  // safe freezes (no more interaction), Objective 5 begins and the monster turns
+  // relentless. The player takes the gun with E.
   _onSafeOpened() {
     if (this._safeOpenedDone) return;
     this._safeOpenedDone = true;
-    this.ui.completeObjective();                  // Objective 4 ✓
-    this.currentObjective = null;                 // next objective comes later
+    this.safe.frozen = true;                       // can't be closed now — take the gun
+    this.ui.completeObjective();                   // Objective 4 ✓
+
+    this._gunDisplay = this.gun.makeSafeInstance(); // the pistol lying flat at the open safe's mouth
+    this._gunDisplay.position.set(GUN.safePos.x, GUN.safePos.y, GUN.safePos.z);
+    this._gunDisplay.rotation.set(GUN.safeRot.x, GUN.safeRot.y, GUN.safeRot.z);
+    this.engine.scene.add(this._gunDisplay);
+
+    this.monster.relentless = true;                // it will never give up now
+    this.currentObjective = 'Objective 5: Kill Nulmire';
+    if (this._obj5Timer) clearTimeout(this._obj5Timer);
+    this._obj5Timer = setTimeout(() => {
+      if (this.state !== 'gameover' && this.state !== 'ending' && !this.nightCardLock) this.ui.setObjective(this.currentObjective);
+    }, 2200);
+  }
+
+  _nearSafe() {
+    const p = this.player.position;
+    return Math.hypot(p.x - SAFE.x, p.z - SAFE.z) < GUN.takeDist;
+  }
+
+  _takeGun() {
+    if (this.gunTaken) return;
+    this.gunTaken = true;
+    this.gun.equip();                              // first-person viewmodel on
+    if (this._gunDisplay) { this.engine.scene.remove(this._gunDisplay); this._gunDisplay = null; }
+    this.sfx.blip(620);
+    this.ui.setPrompt(null);
+  }
+
+  // ---------------- shooting ----------------
+  _fireGun() {
+    this.gun.fire();                               // recoil + muzzle flash
+    this.sfx.gun();
+    if (this.monster.state === 'dead' || this.monster.state === 'caught') return;
+    if (this._gunHitsMonster()) this._killMonster();
+  }
+
+  // Hitscan from the camera centre: project the monster onto the aim ray, hit if
+  // close enough, in range and in front, with clear line of sight (no wall).
+  _gunHitsMonster() {
+    const cam = this.engine.camera;
+    const fwd = this._sFwd || (this._sFwd = new THREE.Vector3());
+    cam.getWorldDirection(fwd);
+    const center = this._sCenter || (this._sCenter = new THREE.Vector3());
+    center.copy(this.monster.root.position); center.y += MONSTER.height * 0.5;
+    const toM = this._sTo || (this._sTo = new THREE.Vector3());
+    toM.copy(center).sub(cam.position);
+    const proj = toM.dot(fwd);
+    if (proj < 0 || proj > GUN.range) return false;
+    const closest = this._sClose || (this._sClose = new THREE.Vector3());
+    closest.copy(cam.position).addScaledVector(fwd, proj);
+    if (closest.distanceTo(center) > GUN.hitRadius) return false;
+    const ray = this._shotRay || (this._shotRay = new THREE.Raycaster());
+    ray.firstHitOnly = true; ray.set(cam.position, fwd); ray.far = proj - 0.3;
+    if (ray.intersectObject(this.world.collider.mesh, false).length) return false; // blocked by a wall
+    return true;
+  }
+
+  // Shot dead → explode + scream, complete Objective 5, then the win cinematic.
+  _killMonster() {
+    if (this.monster.state === 'dead') return;
+    this.monster.kill();
+    this._chasing = false; this.sfx.stopChase();
+    this.sfx.play('jumpscare', { volume: AUDIO.jumpscareVolume }); // dies screaming
+    this._spawnExplosion(this.monster.root.position);
+    this.ui.completeObjective();                   // Objective 5 ✓
+    this.currentObjective = null;
+    this.state = 'ending';                         // Nulmire dropped the key; you get out
+    this.ending = { t: 0 }; this._endShown = false;
+    this.ui.fadeShow(); this.ui.fadeSet(0);        // start darkening from clear
+  }
+
+  _spawnExplosion(pos) {
+    const N = 120;
+    const positions = new Float32Array(N * 3);
+    this._exVel = [];
+    for (let i = 0; i < N; i++) {
+      positions[i * 3] = pos.x; positions[i * 3 + 1] = pos.y + 0.9; positions[i * 3 + 2] = pos.z;
+      const dir = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 1.6 - 0.2, Math.random() * 2 - 1)
+        .normalize().multiplyScalar(1.5 + Math.random() * 4.5);
+      this._exVel.push(dir);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({ color: 0xff5a22, size: 0.14, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+    this._explosion = new THREE.Points(geo, mat);
+    this.engine.scene.add(this._explosion);
+    this._explosionT = 0;
+  }
+
+  _updateExplosion(dt) {
+    if (!this._explosion) return;
+    this._explosionT += dt;
+    const pos = this._explosion.geometry.attributes.position;
+    for (let i = 0; i < this._exVel.length; i++) {
+      const v = this._exVel[i];
+      pos.setXYZ(i, pos.getX(i) + v.x * dt, pos.getY(i) + v.y * dt, pos.getZ(i) + v.z * dt);
+      v.y -= 7 * dt;
+    }
+    pos.needsUpdate = true;
+    this._explosion.material.opacity = Math.max(0, 1 - this._explosionT / 1.1);
+    if (this._explosionT > 1.1) {
+      this.engine.scene.remove(this._explosion);
+      this._explosion.geometry.dispose(); this._explosion.material.dispose(); this._explosion = null;
+    }
   }
 
   _win() {
@@ -354,6 +465,7 @@ class Game {
       runBtn: document.getElementById('touch-run'),
       lightBtn: document.getElementById('touch-light'),
       useBtn: document.getElementById('touch-use'),
+      fireBtn: document.getElementById('touch-fire'),
     });
   }
 
@@ -396,6 +508,7 @@ class Game {
       this.monster.update(dt);
       this.pickups.update(dt);
       this.safe.update(dt);
+      this.gun.update(dt);
 
       this.sfx.setListener(this.engine.camera);
       this.sfx.startAmbience(AUDIO.ambienceVolume); // starts once the buffer is ready
@@ -411,7 +524,9 @@ class Game {
         const door = this.doors.interact(this.engine.camera);
         if (door === 'toggled') this.sfx.play('door', { volume: AUDIO.doorVolume });
         else if (door === 'locked') this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
-        else if (this.safe.targeted()) {
+        else if (this._safeOpenedDone && !this.gunTaken && this._nearSafe()) {
+          this._takeGun();                          // take the pistol from the open safe
+        } else if (!this.safe.frozen && this.safe.targeted()) {
           const r = this.safe.interact();
           if (r === 'locked') {
             this.sfx.play('door', { volume: AUDIO.doorVolume * 0.5, rate: 1.35 }); // heavy, won't budge
@@ -423,10 +538,15 @@ class Game {
         }
         this.pickups.tryInteract();
       }
-      // door prompt first; if none, offer the safe prompt when it's in view
+      if (this.input.consumeEdge('fire') && this.gunTaken) this._fireGun();
+
+      // prompts: door, then take-the-gun, then the safe
       let prompt = null;
       this.doors.update(dt, this.engine.camera, (txt) => { prompt = txt; });
-      if (!prompt && this.safe.targeted()) prompt = this.safe.open ? 'Close safe' : 'Open safe';
+      if (!prompt) {
+        if (this._safeOpenedDone && !this.gunTaken && this._nearSafe()) prompt = 'Take the pistol';
+        else if (!this.safe.frozen && this.safe.targeted()) prompt = this.safe.open ? 'Close safe' : 'Open safe';
+      }
       this.ui.setPrompt(prompt);
       if (this.input.consumeEdge('pause')) {
         if (this.input.locked) this.input.exitLock(); // pointerlockchange → pause
@@ -438,6 +558,17 @@ class Game {
       this._scareFrame(dt);
       this.input.consumeEdge('pause');
       this.input.consumeEdge('interact');
+    } else if (this.state === 'ending') {
+      // Nulmire is dead: keep the world + gun + explosion alive while the screen
+      // slowly darkens, then show the "YOU KILLED NULMIRE" card + main menu.
+      this.world.update(dt, this.engine.camera.position);
+      this.flashlight.update(dt, this.engine.camera);
+      this.gun.update(dt);
+      this._updateExplosion(dt);
+      this.ending.t += dt;
+      this.ui.fadeSet(Math.min(1, this.ending.t / 3.6));
+      if (this.ending.t >= 3.6 && !this._endShown) { this._endShown = true; this.ui.showKilled(() => location.reload()); }
+      this.input.consumeEdge('pause'); this.input.consumeEdge('interact'); this.input.consumeEdge('fire');
     } else if (this.world) {
       // keep the world breathing behind the menus
       this.flashlight.update(dt, this.engine.camera);

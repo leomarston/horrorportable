@@ -11,7 +11,7 @@ export default class Input {
     this._look = { x: 0, y: 0 };
     this.run = false;
     this.crouch = false;
-    this._edges = { jump: false, flashlight: false, pause: false, interact: false };
+    this._edges = { jump: false, flashlight: false, pause: false, interact: false, fire: false };
     this.locked = false;
     this._dragging = false;
 
@@ -58,7 +58,10 @@ export default class Input {
     });
     // Look works either via pointer-lock OR click-drag (fallback when lock is
     // unavailable, e.g. inside an embedded/secured preview frame).
-    this.canvas.addEventListener('mousedown', () => { this._dragging = true; });
+    this.canvas.addEventListener('mousedown', (e) => {
+      this._dragging = true;
+      if (e.button === 0 && this.locked) this._edges.fire = true; // left-click fires (only when locked)
+    });
     addEventListener('mouseup', () => { this._dragging = false; });
     addEventListener('mousemove', (e) => {
       if (this.locked || this._dragging) {
@@ -79,7 +82,7 @@ export default class Input {
 
   // ---------------- touch ----------------
   enableTouch(els) {
-    const { stick, knob, look, runBtn, lightBtn, useBtn } = els;
+    const { stick, knob, look, runBtn, lightBtn, useBtn, fireBtn } = els;
     const t = this._touch;
     const R = () => stick.clientWidth * 0.5;
 
@@ -118,6 +121,7 @@ export default class Input {
     runBtn.addEventListener('pointerdown', () => { t.runHeld = !t.runHeld; runBtn.classList.toggle('active', t.runHeld); });
     lightBtn.addEventListener('pointerdown', () => { this._edges.flashlight = true; });
     if (useBtn) useBtn.addEventListener('pointerdown', () => { this._edges.interact = true; });
+    if (fireBtn) fireBtn.addEventListener('pointerdown', () => { this._edges.fire = true; });
   }
 
   // ---------------- frame API ----------------

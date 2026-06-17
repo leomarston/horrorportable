@@ -74,6 +74,7 @@
         <div id="touch-move" class="touch-stick"><div class="touch-knob"></div></div>
         <div id="touch-look" class="touch-look"></div>
         <div class="touch-buttons">
+          <button id="touch-fire" class="touch-btn">FIRE</button>
           <button id="touch-use" class="touch-btn">USE</button>
           <button id="touch-run" class="touch-btn">RUN</button>
           <button id="touch-light" class="touch-btn">LIGHT</button>
@@ -92,6 +93,16 @@
         <div class="win-inner">
           <h1 class="title gameover-title">GAME&nbsp;OVER</h1>
           <p class="subtitle">the house kept you · three nights gone</p>
+        </div>
+      </div>
+
+      <!-- Killed Nulmire (win) -->
+      <div id="killed" class="overlay killed-overlay hidden">
+        <div class="vignette"></div>
+        <div class="win-inner">
+          <h1 class="title killed-title">YOU&nbsp;KILLED&nbsp;NULMIRE</h1>
+          <p class="subtitle">you took the key and walked out into the night</p>
+          <button id="killed-menu" class="enter-btn">MAIN MENU</button>
         </div>
       </div>
 

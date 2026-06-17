@@ -56,6 +56,7 @@ export default class Safe {
     }
     this.open = false;
     this.locked = true;   // won't open until all the papers are collected
+    this.frozen = false;  // once opened, freezes so you can't close it (take the gun instead)
     this._t = 0;          // current scrub time within the clip
     this._dir = 0;        // +1 opening, -1 closing, 0 settled
 
@@ -79,8 +80,9 @@ export default class Safe {
     return hit.length > 0 && hit[0].distance <= SAFE.range;
   }
 
-  /** Try to open/close. Returns 'locked', 'opened' or 'closed'. */
+  /** Try to open/close. Returns 'locked', 'frozen', 'opened' or 'closed'. */
   interact() {
+    if (this.frozen) return 'frozen';   // already opened — no more interaction
     if (this.locked) return 'locked';
     this.open = !this.open;
     this._dir = this.open ? 1 : -1;

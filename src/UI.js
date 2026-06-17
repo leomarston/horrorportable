@@ -36,6 +36,11 @@ export default class UI {
   }
 
   showGameOver() { this.el.gameover.classList.remove('hidden'); }
+  showKilled(onMenu) {
+    const el = document.getElementById('killed');
+    el.classList.remove('hidden');
+    document.getElementById('killed-menu').onclick = onMenu;
+  }
 
   // ---- opening fade-from-black ----
   fadeShow() { this.el.introFade.style.display = 'block'; this.el.introFade.style.opacity = '1'; }
