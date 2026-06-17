@@ -38,9 +38,22 @@ export const PLAYER = {
   gravity: -23,          // units/s^2 (~-18 m/s^2, slightly punchy)
   jumpSpeed: 8.5,        // → ~1.2 m hop
   fallRespawnY: -40,     // if we somehow fall through the world, respawn
-  headBobSpeed: 9.5,
-  headBobAmount: 0.045,
   stepSubdivisions: 5,   // collision substeps per frame for stability
+
+  // --- first-person "gait" feel (grounds the camera so it doesn't feel like flying) ---
+  bobStepFreq: 0.95,     // strides per second per unit of walk speed (scales with how fast you move)
+  bobVertWalk: 0.06,     // vertical head travel while walking (units)
+  bobVertRun: 0.105,     // vertical head travel while running
+  bobLatWalk: 0.045,     // side-to-side sway while walking
+  bobLatRun: 0.075,      // side-to-side sway while running
+  bobRoll: 0.018,        // camera roll coupled to the sway (rad)
+  strafeRoll: 0.035,     // lean into strafing left/right (rad)
+  bobSmooth: 16,         // how quickly the bob eases in/out
+  runFovKick: 7,         // extra vertical FOV (deg) while sprinting → sense of speed
+  fovDamp: 7,            // FOV ease rate
+  landDipMax: 0.17,      // deepest camera dip on a hard landing (units)
+  landImpactScale: 0.02, // landing dip per unit of impact speed
+  landRecover: 8.5,      // how fast the knees straighten after a landing
 };
 
 // Spawn: just outside the house in the yard, facing the building (−Z).

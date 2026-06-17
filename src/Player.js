@@ -23,8 +23,14 @@ export default class Player {
     this.pitch = 0;
     this.segLen = PLAYER.standSegment;
     this.onGround = false;
-    this.bobT = 0;
-    this.bob = 0;
+    this.bobT = 0;          // stride phase
+    this.bobVert = 0;       // current vertical head offset
+    this.bobLat = 0;        // current lateral head offset
+    this.roll = 0;          // current camera roll
+    this._bobGain = 0;      // smoothed amplitude envelope (0 still → 1 striding)
+    this._lean = 0;         // smoothed strafe lean
+    this._landDip = 0;      // transient camera dip after a landing
+    this._baseFov = camera.fov;
     this.extraColliders = []; // dynamic BVHs (e.g. closed doors): { geometry, active() }
     this._trees = [];
 
@@ -47,6 +53,8 @@ export default class Player {
     this.yaw = yaw;
     this.pitch = pitch;
     this.onGround = false;
+    this.bobVert = 0; this.bobLat = 0; this.roll = 0;
+    this._bobGain = 0; this._lean = 0; this._landDip = 0;
   }
 
   update(dt) {
@@ -100,6 +108,8 @@ export default class Player {
     }
 
     // ---- integrate + collide (sub-stepped) ----
+    const wasOnGround = this.onGround;
+    const descentSpeed = Math.max(0, -this.velocity.y); // downward speed entering this frame
     const steps = PLAYER.stepSubdivisions;
     const sdt = dt / steps;
     let grounded = false;
@@ -109,6 +119,11 @@ export default class Player {
       if (this._collide(sdt)) grounded = true;
     }
     this.onGround = grounded;
+
+    // landing impact → a quick knee-bend dip that springs back
+    if (!wasOnGround && grounded && descentSpeed > 1.5) {
+      this._landDip = Math.min(PLAYER.landDipMax, descentSpeed * PLAYER.landImpactScale);
+    }
 
     // ---- map-edge clamp (controls the edges of the world) ----
     const w = this.collider.walkable;
@@ -176,21 +191,44 @@ export default class Player {
   }
 
   _applyCamera(dt) {
-    // head-bob driven by horizontal speed while grounded
+    const cam = this.camera;
     const sh = Math.hypot(this.velocity.x, this.velocity.z);
-    const target = PLAYER.walkSpeed;
-    if (this.onGround && sh > 0.4) {
-      this.bobT += dt * PLAYER.headBobSpeed * Math.min(1.4, sh / target);
-      const amt = PLAYER.headBobAmount * Math.min(1, sh / target);
-      this.bob = Math.sin(this.bobT) * amt;
-    } else {
-      this.bob = THREE.MathUtils.damp(this.bob, 0, 8, dt);
+    const walk = PLAYER.walkSpeed;
+    const gaitTarget = this.onGround ? Math.min(1, sh / walk) : 0; // 0 = still/airborne, 1 = striding
+
+    // Smooth the *amplitude envelope* (so the bob eases in/out), but apply the
+    // oscillation itself directly — damping the oscillation would flatten the
+    // faster running bob into nothing.
+    this._bobGain = THREE.MathUtils.damp(this._bobGain, gaitTarget, PLAYER.bobSmooth, dt);
+
+    // advance the stride phase in proportion to ground speed (faster = quicker steps)
+    if (gaitTarget > 0.05) this.bobT += dt * PLAYER.bobStepFreq * sh * Math.PI;
+
+    // blend bob amplitude between a walk and a run by how fast we're going
+    const runMix = THREE.MathUtils.clamp((sh - walk) / Math.max(0.01, PLAYER.runSpeed - walk), 0, 1);
+    const vAmp = THREE.MathUtils.lerp(PLAYER.bobVertWalk, PLAYER.bobVertRun, runMix);
+    const lAmp = THREE.MathUtils.lerp(PLAYER.bobLatWalk, PLAYER.bobLatRun, runMix);
+
+    // figure-8 head motion: head dips on every footfall (|sin|), sways once per stride (sin)
+    this.bobVert = -Math.abs(Math.sin(this.bobT)) * vAmp * this._bobGain;
+    this.bobLat = Math.sin(this.bobT) * lAmp * this._bobGain;
+
+    // roll: smoothed lean into a strafe + a gentle oscillating gait roll
+    this._lean = THREE.MathUtils.damp(this._lean, -this.input.move.x * PLAYER.strafeRoll, 10, dt);
+    this.roll = this._lean + Math.sin(this.bobT) * PLAYER.bobRoll * this._bobGain;
+    this._landDip = THREE.MathUtils.damp(this._landDip, 0, PLAYER.landRecover, dt);
+
+    // FOV kick while actually sprinting → a real sense of speed
+    const sprinting = this.input.run && !this.input.crouch && sh > walk * 1.05;
+    const fovTarget = this._baseFov + (sprinting ? PLAYER.runFovKick : 0);
+    if (Math.abs(cam.fov - fovTarget) > 0.02) {
+      cam.fov = THREE.MathUtils.damp(cam.fov, fovTarget, PLAYER.fovDamp, dt);
+      cam.updateProjectionMatrix();
     }
 
-    const cam = this.camera;
     cam.position.copy(this.position);
-    cam.position.y += this.bob;
-    cam.position.addScaledVector(this._right, Math.cos(this.bobT * 0.5) * this.bob * 0.6);
-    cam.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    cam.position.y += this.bobVert - this._landDip;
+    cam.position.addScaledVector(this._right, this.bobLat);
+    cam.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ');
   }
 }
