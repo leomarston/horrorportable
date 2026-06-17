@@ -8,7 +8,6 @@ export default class UI {
       pause: $('pause'), resumeBtn: $('resume-btn'), settings: $('settings'),
       hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
-      scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
       bookCount: $('book-count'), bookGoal: $('book-goal'), batteryFill: $('battery-fill'),
       win: $('win'), winAgain: $('win-again'),
     };
@@ -35,14 +34,6 @@ export default class UI {
   }
   hideWin() { this.el.win.classList.add('hidden'); }
 
-  showScare() {
-    this.el.scare.classList.remove('hidden');
-    this.el.scareText.classList.add('hidden');
-    const f = this.el.scareFlash;           // replay the flash animation
-    f.style.animation = 'none'; void f.offsetWidth; f.style.animation = '';
-  }
-  showDeath() { this.el.scareText.classList.remove('hidden'); }
-  hideScare() { this.el.scare.classList.add('hidden'); this.el.scareText.classList.add('hidden'); }
 
   setPrompt(text) {
     if (text === this._promptText) return;

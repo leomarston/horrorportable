@@ -96,14 +96,14 @@ export const PICKUPS = {
   hoverHeight: 0.7,    // how far above the floor an item floats (units)
   collectDist: 1.5,    // walk within this to collect (units)
   books: [
-    { x: -40, y: -0.2, z: -125 }, { x: -46, y: -0.2, z: -128 }, { x: -34, y: -0.2, z: -123 },
-    { x: -49, y: -0.2, z: -122 }, { x: -32, y: -0.2, z: -128 }, { x: -50, y: -0.2, z: -129 },
-    { x: -38, y: -1.3, z: -96 },  { x: -28, y: -1.3, z: -101 }, { x: -52, y: -1.3, z: -102 },
-    { x: -41, y: -1.3, z: -84 },
+    { x: -51, y: -0.2, z: -124 }, { x: -47, y: -0.2, z: -124 }, { x: -43, y: -0.2, z: -123 },
+    { x: -40, y: -0.2, z: -126 }, { x: -36, y: -0.2, z: -124 }, { x: -33, y: -0.2, z: -124 },
+    { x: -30, y: -0.2, z: -124 }, { x: -50, y: -0.2, z: -128 }, { x: -44, y: -0.2, z: -129 },
+    { x: -34, y: -0.2, z: -130 },
   ],
   batteries: [
-    { x: -44, y: -0.2, z: -124 }, { x: -31, y: -1.3, z: -92 },
-    { x: -55, y: -1.3, z: -110 }, { x: -36, y: -0.2, z: -129 },
+    { x: -46, y: -0.2, z: -122 }, { x: -38, y: -0.2, z: -123 },
+    { x: -31, y: -0.2, z: -128 }, { x: -53, y: -0.2, z: -126 },
   ],
 };
 
@@ -163,30 +163,5 @@ export const ADAPTIVE = {
   maxScaleBonus: 1.0, // never exceed the preset ceiling
   sampleSeconds: 1.0,
   step: 0.08,
-};
-
-// The wandering monster (DarkFox), on the reachable ground floor of the house
-// (floor ≈ -0.2). Floor detection uses LOW rays so it tracks the ground floor,
-// not the upper floor / roof above it.
-export const MONSTER = {
-  url: './models/darkfox.glb',
-  height: 2.4,                 // target height in house units
-  home: { x: -38, z: -125 },   // centre of its patrol, on the ground floor
-  roam: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 }, // patrols the whole ground floor
-  floorScan: 1.4,             // ray starts this far above feet → skips the upper floor
-  walkSpeed: 1.7,             // units/s (wandering)
-  runSpeed: 3.7,             // units/s (chasing) — beatable: you outrun it by sprinting
-  turnRate: 2.4,             // rad/s (wandering)
-  chaseTurnRate: 4.2,        // rad/s (hunting)
-  arriveDist: 1.0,           // distance to consider a waypoint reached
-  pauseRange: [1.0, 3.0],    // idle pause between waypoints (s)
-
-  // --- hunting the player (tuned to be escapable) ---
-  senseRange: 13,            // notices you within this distance (units) if it has line of sight
-  senseFov: 1.9,             // vision half-cone (rad) ≈ 110°
-  hearRange: 4.8,            // senses your presence within this distance (no sightline needed)
-  loseTime: 4,               // seconds without line of sight before giving up the hunt
-  catchDist: 1.4,            // distance at which it grabs you → jumpscare
-  avoidDist: 2.4,            // wall-avoidance ray length while hunting
 };
 
