@@ -35,7 +35,8 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 // open the front door first, so we can prove the trap closes + locks it.
 const before = await page.evaluate(() => {
   const g = window.__GAME, d = g.doors.doors[0];
-  d.open = true; d.target = g.doors.constructor ? d.target : d.target; d.target = Math.PI * 0.5;
+  g.ui.setObjective(g.objectives[0].label); // show Objective 1 (as the intro would)
+  d.open = true; d.target = Math.PI * 0.5;
   return {
     locked: d.locked, open: d.open,
     trapSprung: g.trapSprung,
@@ -76,8 +77,8 @@ const after = await page.evaluate(() => {
     trapSprung: g.trapSprung,
     locked: d.locked, open: d.open, angle: +d.angle.toFixed(3),
     colliderActive: g.doors.colliders[0].active(),
-    objText: ot ? ot.textContent : '',
-    objVisible: ot ? getComputedStyle(ot).opacity : '0',
+    obj1Done: ot ? ot.classList.contains('done') : false, // trap ticks off Objective 1
+    nextObjective: g.currentObjective,
   };
 });
 
@@ -109,7 +110,8 @@ const pass = ready
   && after.open === false
   && Math.abs(after.angle) < 0.12         // slammed shut
   && after.colliderActive === true        // blocks the player again
-  && /Find a way out/.test(after.objText)
+  && after.obj1Done === true              // trap completes Objective 1
+  && /find the safe/i.test(after.nextObjective)  // and queues Objective 2
   && reopen.stillLocked === true
   && reopen.stillClosedTarget === 0
   && errors.length === 0;

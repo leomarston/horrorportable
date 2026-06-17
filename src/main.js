@@ -69,11 +69,11 @@ class Game {
       this.monster.onCaught = () => this._jumpscare();
 
       this.paperCount = 0;
+      this.papersRevealed = false;   // papers + counter appear only once Objective 3 begins
       const paperGltf = await Pickups.loadPaper();
       this.pickups = new Pickups(this.engine.scene, this.world.collider, this.player, paperGltf, {
         onPaper: () => this._onPaper(),
       });
-      this.ui.setBooks(0, this.pickups.total);
 
       // Missions (more objectives will be added as the game grows).
       this.objIndex = 0;
@@ -258,12 +258,51 @@ class Game {
     this.ui.showGameOver();
   }
 
-  // ---------------- pickups / win ----------------
+  // ---------------- safe / papers ----------------
+  // Trying the locked safe completes "find the safe" and starts Objective 3,
+  // which is when the papers scatter and the counter appears.
+  _onSafeLocked() {
+    if (this.papersRevealed || !this.trapSprung) return; // only after Objective 2 is active
+    this.papersRevealed = true;
+    this.ui.completeObjective();                  // Objective 2 ✓
+    this.pickups.spawn();                         // papers spawn randomly in the house
+    this.ui.setBooks(this.paperCount, this.pickups.total);
+    this.ui.showPaperCounter();                   // top-right counter now appears
+    this.currentObjective = 'Objective 3: Collect all the papers to unlock the safe';
+    if (this._obj3Timer) clearTimeout(this._obj3Timer);
+    this._obj3Timer = setTimeout(() => {
+      if (this.state !== 'gameover' && !this.nightCardLock) this.ui.setObjective(this.currentObjective);
+    }, 2200);
+  }
+
   _onPaper() {
     this.paperCount++;
     this.ui.setBooks(this.paperCount, this.pickups.total);
     this.sfx.blip(880);
-    if (this.paperCount >= this.pickups.total) this._win();
+    if (this.pickups.total > 0 && this.paperCount >= this.pickups.total) this._allPapersCollected();
+  }
+
+  // All papers gathered → the safe unlocks, Objective 3 is complete, and
+  // Objective 4 (open the safe) appears.
+  _allPapersCollected() {
+    if (this._papersDone) return;
+    this._papersDone = true;
+    this.safe.unlock();
+    this.ui.completeObjective();                  // Objective 3 ✓
+    this.sfx.blip(1320);
+    this.currentObjective = 'Objective 4: Open the safe';
+    if (this._obj4Timer) clearTimeout(this._obj4Timer);
+    this._obj4Timer = setTimeout(() => {
+      if (this.state !== 'gameover' && !this.nightCardLock) this.ui.setObjective(this.currentObjective);
+    }, 2200);
+  }
+
+  // Opening the unlocked safe completes Objective 4.
+  _onSafeOpened() {
+    if (this._safeOpenedDone) return;
+    this._safeOpenedDone = true;
+    this.ui.completeObjective();                  // Objective 4 ✓
+    this.currentObjective = null;                 // next objective comes later
   }
 
   _win() {
@@ -373,8 +412,14 @@ class Game {
         if (door === 'toggled') this.sfx.play('door', { volume: AUDIO.doorVolume });
         else if (door === 'locked') this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
         else if (this.safe.targeted()) {
-          const opened = this.safe.interact();
-          this.sfx.play('door', { volume: AUDIO.doorVolume * 0.7, rate: opened ? 0.95 : 1.15 });
+          const r = this.safe.interact();
+          if (r === 'locked') {
+            this.sfx.play('door', { volume: AUDIO.doorVolume * 0.5, rate: 1.35 }); // heavy, won't budge
+            this._onSafeLocked();
+          } else {
+            this.sfx.play('door', { volume: AUDIO.doorVolume * 0.7, rate: r === 'opened' ? 0.95 : 1.15 });
+            if (r === 'opened') this._onSafeOpened();
+          }
         }
         this.pickups.tryInteract();
       }

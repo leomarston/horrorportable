@@ -20,12 +20,19 @@ export default class Pickups {
     this.player = player;
     this.onPaper = opts.onPaper;
     this.items = [];
+    this.spawned = false;
 
     this._proto = this._buildProto(paperGltf);
-    this._place();
   }
 
   get total() { return this.items.length; }
+
+  /** Scatter the papers across the house (called once, when Objective 3 begins). */
+  spawn() {
+    if (this.spawned) return;
+    this.spawned = true;
+    this._place();
+  }
 
   // Scale, centre and matte-ify the paper once; clones share its geometry/material.
   _buildProto(gltf) {

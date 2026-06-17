@@ -50,8 +50,8 @@ const placement = await page.evaluate(() => {
 
 const closedQ = await hingeQuat();
 
-// open it
-await page.evaluate(() => window.__GAME.safe.interact());
+// open it (the safe starts locked until all papers are collected — unlock for this animation test)
+await page.evaluate(() => { window.__GAME.safe.unlock(); window.__GAME.safe.interact(); });
 await settle(900); // longer than the 1.46s clip? give it ~enough; poll below
 let settled = false;
 for (let i = 0; i < 60 && !settled; i++) { await settle(50); settled = await page.evaluate(() => window.__GAME.safe._dir === 0); }

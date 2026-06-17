@@ -92,6 +92,8 @@ export default class UI {
     this.el.bookGoal.textContent = goal;
   }
 
+  showPaperCounter() { document.getElementById('book-counter').classList.remove('hidden'); }
+
   showWin(onAgain) {
     this.el.win.classList.remove('hidden');
     this.el.winAgain.onclick = onAgain;

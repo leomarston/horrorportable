@@ -55,6 +55,7 @@ export default class Safe {
       this.mixer.update(0);
     }
     this.open = false;
+    this.locked = true;   // won't open until all the papers are collected
     this._t = 0;          // current scrub time within the clip
     this._dir = 0;        // +1 opening, -1 closing, 0 settled
 
@@ -78,12 +79,15 @@ export default class Safe {
     return hit.length > 0 && hit[0].distance <= SAFE.range;
   }
 
-  /** Toggle open/closed; returns the new open state. */
+  /** Try to open/close. Returns 'locked', 'opened' or 'closed'. */
   interact() {
+    if (this.locked) return 'locked';
     this.open = !this.open;
     this._dir = this.open ? 1 : -1;
-    return this.open;
+    return this.open ? 'opened' : 'closed';
   }
+
+  unlock() { this.locked = false; }
 
   update(dt) {
     if (!this.action || this._dir === 0) return;

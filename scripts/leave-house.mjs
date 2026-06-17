@@ -38,11 +38,12 @@ await page.evaluate(() => {
 
 const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 1) Drop the player INSIDE the house right next to the monster and force a chase.
+// 1) Drop the player + monster on a known interior ground-floor spot, force a chase.
 const inside = await page.evaluate(() => {
-  const g = window.__GAME, m = g.monster, p = g.player;
-  // stand the player on the monster's own ground spot (guaranteed interior floor)
-  p.position.set(m.pos.x, m.feetY + 1.0, m.pos.z - 1.5);
+  const g = window.__GAME, m = g.monster, p = g.player, c = g.world.collider;
+  const ix = -40, iz = -125, fy = c.groundY(ix, iz, 1.7) ?? -0.2; // solidly inside the house
+  p.position.set(ix, fy + 1.0, iz);
+  m.pos.set(ix + 1.5, fy, iz); m.feetY = fy; // monster right next to the player, on the floor
   m.lastSeen.copy(p.position);
   m.state = 'chase';
   return {
