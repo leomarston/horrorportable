@@ -5,13 +5,14 @@ import { loadWorld } from './AssetLoader.js';
 import World from './World.js';
 import Player from './Player.js';
 import Doors from './Doors.js';
+import Monster from './Monster.js';
 import Pickups from './Pickups.js';
 import Flashlight from './Flashlight.js';
 import Input from './Input.js';
 import PostFX from './PostFX.js';
 import UI from './UI.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL } from './config.js';
+import { ASSET_URL, MONSTER } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -54,6 +55,11 @@ class Game {
       this.doors = new Doors(this.engine.scene, this.engine.camera);
       this.player.extraColliders = this.doors.colliders;
 
+      this.ui.setStatus('something stirs inside…');
+      const monsterGltf = await Monster.load();
+      this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
+      this.monster.onCaught = () => this._jumpscare();
+
       this.bookCount = 0;
       this.pickups = new Pickups(this.engine.scene, this.world.collider, this.player, this.flashlight, {
         onBook: () => this._onBook(),
@@ -92,6 +98,82 @@ class Game {
   _initAudio() {
     if (this.audio) { if (this.audio.state === 'suspended') this.audio.resume(); return; }
     try { this.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.audio = null; }
+  }
+
+  // ---------------- jumpscare ----------------
+  _jumpscare() {
+    if (this.state === 'scare') return;
+    this.state = 'scare';
+    this.scareT = 0;
+    this._deathShown = false;
+    if (this.input.locked) this.input.exitLock();
+    this.monster.attackPose();   // play the Attack clip
+    this.ui.showScare();
+    this._screech();
+  }
+
+  _scareFrame(dt) {
+    const cam = this.engine.camera;
+    const m = this.monster;
+    const fwd = this._fwd || (this._fwd = new THREE.Vector3());
+    fwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    m.root.position.copy(cam.position).addScaledVector(fwd, 1.7);
+    m.root.position.y = cam.position.y - 1.75;
+    m.root.rotation.y = Math.atan2(-fwd.x, -fwd.z) + MONSTER.facingOffset;
+    m.tickMixer(dt);             // advance the attack animation
+
+    if (this.scareT < 1.0) {
+      cam.position.x += (Math.random() - 0.5) * 0.06;
+      cam.position.y += (Math.random() - 0.5) * 0.06;
+      cam.rotation.z = (Math.random() - 0.5) * 0.08;
+    } else {
+      cam.rotation.z = 0;
+    }
+    this.flashlight.update(dt, cam);
+
+    if (this.scareT > 1.2 && !this._deathShown) { this._deathShown = true; this.ui.showDeath(); }
+    if (this.scareT > 3.4) this._respawn();
+  }
+
+  _respawn() {
+    this.ui.hideScare();
+    this.engine.camera.rotation.z = 0;
+    this.player.spawn(this.world.spawnPoint, this.world.spawnYaw, this.world.spawnPitch);
+    this.player._applyCamera(0);
+    this.monster.reset();
+    this.state = 'playing';
+    if (!this.touch) this.input.requestLock();
+  }
+
+  /** Synthesised screech stinger (no audio asset needed). */
+  _screech() {
+    const ac = this.audio;
+    if (!ac) return;
+    if (ac.state === 'suspended') ac.resume();
+    const now = ac.currentTime;
+    const master = ac.createGain();
+    master.gain.value = 0.9; master.connect(ac.destination);
+
+    const dur = 1.3;
+    const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.4);
+    const noise = ac.createBufferSource(); noise.buffer = buf;
+    const ng = ac.createGain(); ng.gain.value = 0.5;
+    noise.connect(ng); ng.connect(master); noise.start(now);
+
+    const tg = ac.createGain();
+    tg.gain.setValueAtTime(0.0001, now);
+    tg.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+    tg.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+    tg.connect(master);
+    for (const f of [98, 104, 207, 660]) {
+      const o = ac.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 2.2, now);
+      o.frequency.exponentialRampToValueAtTime(f, now + 0.9);
+      o.connect(tg); o.start(now); o.stop(now + 1.15);
+    }
   }
 
   // ---------------- pickups / win ----------------
@@ -171,6 +253,7 @@ class Game {
       this.player.update(dt);
       this.flashlight.update(dt, this.engine.camera);
       this.world.update(dt, this.player.position);
+      this.monster.update(dt);
       this.pickups.update(dt);
       this.ui.setBattery(this.flashlight.battery);
       if (this.input.consumeEdge('interact')) this.doors.interact(this.engine.camera);
@@ -179,6 +262,12 @@ class Game {
         if (this.input.locked) this.input.exitLock(); // pointerlockchange → pause
         else this._pause();                            // no lock: pause directly
       }
+    } else if (this.state === 'scare') {
+      this.scareT += dt;
+      this.world.update(dt, this.engine.camera.position);
+      this._scareFrame(dt);
+      this.input.consumeEdge('pause');
+      this.input.consumeEdge('interact');
     } else if (this.world) {
       // keep the world breathing behind the menus
       this.flashlight.update(dt, this.engine.camera);

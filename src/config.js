@@ -165,3 +165,29 @@ export const ADAPTIVE = {
   step: 0.08,
 };
 
+// The Momo monster — uses its own baked Walk / Idle / Attack clips. Lives on the
+// reachable ground floor; floor detection uses LOW rays (skips the upper floor).
+export const MONSTER = {
+  url: './models/momo.glb',
+  height: 2.2,                 // target height in house units
+  facingOffset: 0,            // model forward correction (rad) — tuned after a render
+  runAnimSpeed: 1.7,          // walk clip timeScale while chasing ("fast walking" = running)
+  home: { x: -38, z: -125 },   // centre of its patrol, on the ground floor
+  roam: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 },
+  floorScan: 1.4,             // ray starts this far above feet → skips the upper floor
+  walkSpeed: 1.7,             // units/s (wandering)
+  runSpeed: 3.7,             // units/s (chasing) — beatable: outrun by sprinting
+  turnRate: 2.4,             // rad/s (wandering)
+  chaseTurnRate: 4.2,        // rad/s (hunting)
+  arriveDist: 1.0,
+  pauseRange: [1.0, 3.0],
+
+  // --- hunting the player (tuned to be escapable) ---
+  senseRange: 13,
+  senseFov: 1.9,             // vision half-cone (rad) ≈ 110°
+  hearRange: 4.8,
+  loseTime: 4,
+  catchDist: 1.4,
+  avoidDist: 2.4,
+};
+

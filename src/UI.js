@@ -10,10 +10,20 @@ export default class UI {
       touch: $('touch'),
       bookCount: $('book-count'), bookGoal: $('book-goal'), batteryFill: $('battery-fill'),
       win: $('win'), winAgain: $('win-again'),
+      scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
     };
     this._promptText = null;
     this._batLevel = -1;
   }
+
+  showScare() {
+    this.el.scare.classList.remove('hidden');
+    this.el.scareText.classList.add('hidden');
+    const f = this.el.scareFlash;           // replay the flash animation
+    f.style.animation = 'none'; void f.offsetWidth; f.style.animation = '';
+  }
+  showDeath() { this.el.scareText.classList.remove('hidden'); }
+  hideScare() { this.el.scare.classList.add('hidden'); this.el.scareText.classList.add('hidden'); }
 
   setBooks(n, goal) {
     this.el.bookCount.textContent = n;
