@@ -57,15 +57,31 @@ export default class Monster {
     this._play(this.idle, 0);
 
     // ---- wander / hunt state ----
-    this.feetY = collider.groundY(MONSTER.home.x, MONSTER.home.z, 2.5) ?? -0.2;
-    this.pos = new THREE.Vector3(MONSTER.home.x, this.feetY, MONSTER.home.z);
-    this.heading = 0; this.speed = 0; this.t = 0;
-    this.target = this.pos.clone(); this.pauseLeft = 1.0;
+    this.pos = new THREE.Vector3();
+    this.target = new THREE.Vector3();
     this._ray = new THREE.Raycaster(); this._ray.firstHitOnly = true; this._tmp = new THREE.Vector3();
+    this.speed = 0; this.t = 0; this.pauseLeft = 1.0;
     this.state = 'wander'; this.lastSeen = new THREE.Vector3(); this.loseTimer = 0; this.onCaught = null; this._avoidSide = 0;
     this.jump = null; this._jumpCdUntil = 0;
 
+    const sp = this._pickSpawn();              // random spot somewhere in the house
+    this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
+    this.heading = Math.random() * Math.PI * 2;
+
     this._applyTransform();
+  }
+
+  /** A random valid ground-floor spot inside the house. */
+  _pickSpawn() {
+    const r = MONSTER.roam;
+    for (let i = 0; i < 40; i++) {
+      const x = THREE.MathUtils.lerp(r.minX, r.maxX, Math.random());
+      const z = THREE.MathUtils.lerp(r.minZ, r.maxZ, Math.random());
+      const y = this.collider.groundY(x, z, 1.7);   // low ray → ground floor only
+      if (y != null && y > -0.8 && y < 0.6) return new THREE.Vector3(x, y, z);
+    }
+    const y = this.collider.groundY(MONSTER.home.x, MONSTER.home.z, 1.7) ?? -0.2;
+    return new THREE.Vector3(MONSTER.home.x, y, MONSTER.home.z);
   }
 
   _play(action, fade = 0.25) {
@@ -174,13 +190,18 @@ export default class Monster {
 
   _newTarget() {
     const r = MONSTER.roam;
-    for (let i = 0; i < 10; i++) {
+    let bx = 0, by = 0, bz = 0, bestD = -1;
+    for (let i = 0; i < 16; i++) {
       const x = THREE.MathUtils.lerp(r.minX, r.maxX, Math.random());
       const z = THREE.MathUtils.lerp(r.minZ, r.maxZ, Math.random());
       const y = this.collider.groundY(x, z, this.feetY + MONSTER.floorScan);
-      if (y != null && y > this.feetY - 0.6 && y < this.feetY + 1.0) { this.target.set(x, y, z); return; }
+      if (y == null || y <= this.feetY - 0.6 || y >= this.feetY + 1.0) continue;
+      // prefer points farther away so it actually crosses the house
+      const d = (x - this.pos.x) ** 2 + (z - this.pos.z) ** 2;
+      if (d > bestD) { bestD = d; bx = x; by = y; bz = z; }
     }
-    this.target.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
+    if (bestD > 4) this.target.set(bx, by, bz);
+    else this.target.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
   }
 
   _canSee() {
@@ -267,10 +288,10 @@ export default class Monster {
 
   reset() {
     this.state = 'wander';
-    this.feetY = this.collider.groundY(MONSTER.home.x, MONSTER.home.z, 2.5) ?? -0.2;
-    this.pos.set(MONSTER.home.x, this.feetY, MONSTER.home.z);
-    this.speed = 0; this.heading = 0; this.pauseLeft = 1.0; this.loseTimer = 0;
-    this.target.copy(this.pos);
+    const sp = this._pickSpawn();              // reappear somewhere random in the house
+    this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
+    this.speed = 0; this.heading = Math.random() * Math.PI * 2; this.pauseLeft = 1.0; this.loseTimer = 0;
+    this.jump = null;
     if (this.walk) this.walk.timeScale = 1.0;
     this._play(this.idle, 0.1);
     this._applyTransform();
