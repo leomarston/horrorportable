@@ -63,6 +63,7 @@ export default class Monster {
     this.target = this.pos.clone(); this.pauseLeft = 1.0;
     this._ray = new THREE.Raycaster(); this._ray.firstHitOnly = true; this._tmp = new THREE.Vector3();
     this.state = 'wander'; this.lastSeen = new THREE.Vector3(); this.loseTimer = 0; this.onCaught = null; this._avoidSide = 0;
+    this.jump = null; this._jumpCdUntil = 0;
 
     this._applyTransform();
   }
@@ -113,6 +114,8 @@ export default class Monster {
   _advance(dt, dropTol) {
     if (this.speed < 0.01) { this.pos.y = this.feetY; return false; }
     const adv = this.speed * dt;
+    // hard wall block — never move into solid geometry
+    if (this._rayHit(this.heading, this.halfWidth + adv + 0.12)) { this.speed = 0; return false; }
     const nx = this.pos.x + Math.sin(this.heading) * adv;
     const nz = this.pos.z + Math.cos(this.heading) * adv;
     const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
@@ -121,6 +124,44 @@ export default class Monster {
     if (Math.abs(fy - this.feetY) < 1.0) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
     this.pos.set(nx, this.feetY, nz);
     return true;
+  }
+
+  /** Clear line of sight from the monster's eyes to the player (blocked by walls). */
+  _losToPlayer() {
+    const p = this.player.position;
+    const from = _v2.set(this.pos.x, this.feetY + MONSTER.losHeight, this.pos.z);
+    _v.set(p.x - from.x, p.y - 0.3 - from.y, p.z - from.z);
+    const len = _v.length(); _v.normalize();
+    this._ray.set(from, _v); this._ray.far = len - 0.3;
+    return this._ray.intersectObject(this.collider.mesh, false).length === 0;
+  }
+
+  // ---- vault a low obstacle (e.g. a table) when blocked while moving ----
+  _tryJump(heading) {
+    if (this.t < this._jumpCdUntil || this.jump) return false;
+    const jd = MONSTER.jumpDist;
+    const lx = this.pos.x + Math.sin(heading) * jd;
+    const lz = this.pos.z + Math.cos(heading) * jd;
+    const landingY = this.collider.groundY(lx, lz, this.feetY + MONSTER.floorScan);
+    if (landingY == null || landingY < this.feetY - 1.5 || landingY > this.feetY + 1.0) return false; // no/odd landing
+    // must be a LOW obstacle: a ray at clear-height ahead must be unobstructed
+    _v.set(Math.sin(heading), 0, Math.cos(heading));
+    this._ray.set(_v2.set(this.pos.x, this.feetY + MONSTER.jumpClearH, this.pos.z), _v);
+    this._ray.far = jd;
+    if (this._ray.intersectObject(this.collider.mesh, false).length) return false; // tall wall → can't clear
+    this.heading = heading;
+    this.jump = { sx: this.pos.x, sz: this.pos.z, sy: this.feetY, ex: lx, ez: lz, ey: landingY,
+      t: 0, dur: MONSTER.jumpDur, peak: MONSTER.jumpPeak + Math.max(0, landingY - this.feetY) };
+    return true;
+  }
+
+  _updateJump(dt) {
+    const j = this.jump; j.t += dt;
+    const u = Math.min(1, j.t / j.dur);
+    this.pos.x = THREE.MathUtils.lerp(j.sx, j.ex, u);
+    this.pos.z = THREE.MathUtils.lerp(j.sz, j.ez, u);
+    this.pos.y = THREE.MathUtils.lerp(j.sy, j.ey, u) + j.peak * 4 * u * (1 - u);
+    if (u >= 1) { this.feetY = j.ey; this.pos.set(j.ex, j.ey, j.ez); this.jump = null; this._jumpCdUntil = this.t + MONSTER.jumpCooldown; }
   }
 
   _turnToward(targetHeading, rate, dt) {
@@ -147,13 +188,9 @@ export default class Monster {
     const dx = p.x - this.pos.x, dz = p.z - this.pos.z;
     const dist = Math.hypot(dx, dz);
     if (dist > MONSTER.senseRange) return false;
-    if (dist <= MONSTER.hearRange) return true;
-    const from = this._tmp.set(this.pos.x, this.feetY + 1.7, this.pos.z);
-    _v.set(p.x - from.x, p.y - from.y, p.z - from.z);
-    const len = _v.length(); _v.normalize();
-    this._ray.set(from, _v); this._ray.far = len - 0.4;
-    if (this._ray.intersectObject(this.collider.mesh, false).length) return false;
-    let d = Math.atan2(dx, dz) - this.heading;
+    if (!this._losToPlayer()) return false;          // never sense through walls
+    if (dist <= MONSTER.hearRange) return true;       // close + visible
+    let d = Math.atan2(dx, dz) - this.heading;        // else must be within the vision cone
     while (d > Math.PI) d -= 2 * Math.PI;
     while (d < -Math.PI) d += 2 * Math.PI;
     return Math.abs(d) <= MONSTER.senseFov;
@@ -162,6 +199,11 @@ export default class Monster {
   // ---------------- per-frame ----------------
   update(dt) {
     this.t += dt;
+    if (this.jump) {
+      this._updateJump(dt);
+      if (this.walk) { this.walk.timeScale = this.state === 'chase' ? MONSTER.runAnimSpeed : 1; this._play(this.walk, 0.1); }
+      this.mixer.update(dt); this._applyTransform(); return;
+    }
     if (this.state === 'caught') { this.speed = 0; this.mixer.update(dt); this._applyTransform(); return; }
 
     const see = this._canSee();
@@ -191,10 +233,11 @@ export default class Monster {
     const d = this._turnToward(steer, MONSTER.chaseTurnRate, dt);
     const want = Math.abs(d) > 1.0 ? MONSTER.runSpeed * 0.35 : MONSTER.runSpeed;
     this.speed = THREE.MathUtils.damp(this.speed, dist < 0.8 ? 0 : want, 8, dt);
-    this._advance(dt, 1.6);
+    if (!this._advance(dt, 1.6)) this._tryJump(this.heading); // blocked → vault the obstacle
 
+    // grab the player only with a clear line of sight (no grabbing through walls)
     const p = this.player.position;
-    if (Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < MONSTER.catchDist) {
+    if (Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < MONSTER.catchDist && this._losToPlayer()) {
       this.state = 'caught'; this.speed = 0;
       if (this.onCaught) this.onCaught();
     }
@@ -219,7 +262,7 @@ export default class Monster {
     const want = Math.abs(d) > 1.0 ? MONSTER.walkSpeed * 0.4 : MONSTER.walkSpeed;
     this.speed = THREE.MathUtils.damp(this.speed, want, 6, dt);
     if (this._advance(dt, 0.6)) this._stuckT = 0;
-    else { this._stuckT = (this._stuckT || 0) + dt; if (this._stuckT > 0.7) { this._stuckT = 0; this._newTarget(); } }
+    else if (!this._tryJump(this.heading)) { this._stuckT = (this._stuckT || 0) + dt; if (this._stuckT > 0.7) { this._stuckT = 0; this._newTarget(); } }
   }
 
   reset() {
@@ -235,3 +278,4 @@ export default class Monster {
 }
 
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();

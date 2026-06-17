@@ -169,8 +169,8 @@ export const ADAPTIVE = {
 // reachable ground floor; floor detection uses LOW rays (skips the upper floor).
 export const MONSTER = {
   url: './models/momo.glb',
-  height: 2.2,                 // target height in house units
-  facingOffset: 0,            // model forward correction (rad) — tuned after a render
+  height: 1.76,               // 80% size
+  facingOffset: 0,            // model forward correction (rad)
   runAnimSpeed: 1.7,          // walk clip timeScale while chasing ("fast walking" = running)
   home: { x: -38, z: -125 },   // centre of its patrol, on the ground floor
   roam: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 },
@@ -185,9 +185,17 @@ export const MONSTER = {
   // --- hunting the player (tuned to be escapable) ---
   senseRange: 13,
   senseFov: 1.9,             // vision half-cone (rad) ≈ 110°
-  hearRange: 4.8,
+  hearRange: 4.8,            // close-range sense — but still needs line of sight
   loseTime: 4,
   catchDist: 1.4,
   avoidDist: 2.4,
+  losHeight: 1.35,           // eye height for line-of-sight rays (clears low furniture, blocked by walls)
+
+  // --- vaulting low obstacles (e.g. a table) ---
+  jumpDist: 2.5,             // how far ahead it lands
+  jumpPeak: 0.85,            // arc height
+  jumpDur: 0.55,             // seconds
+  jumpClearH: 1.6,           // tallest obstacle top it can clear (above its feet)
+  jumpCooldown: 1.2,         // min time between jumps
 };
 
