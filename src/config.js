@@ -100,6 +100,11 @@ export const PICKUPS = {
   interactDist: 2.4,         // press E to collect a nearby paper
 };
 
+// Region used to detect "inside the house" — the house footprint; a point counts
+// as inside only when its floor is the interior ground floor (above floorAbove,
+// i.e. not the yard at ~-1.3).
+export const INTERIOR = { minX: -56, maxX: -22, minZ: -137, maxZ: -116, floorAbove: -0.8 };
+
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {
   jumpscare: './audio/jumpscare.mp3',

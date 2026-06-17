@@ -11,9 +11,22 @@ export default class UI {
       bookCount: $('book-count'), bookGoal: $('book-goal'),
       win: $('win'), winAgain: $('win-again'),
       scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
+      objective: $('objective'), objLabel: $('obj-label'), objText: $('obj-text'),
     };
     this._promptText = null;
   }
+
+  setObjective(text) {
+    this.el.objText.textContent = text;
+    this.el.objLabel.textContent = 'Objective';
+    this.el.objective.classList.remove('hidden', 'done');
+    this.el.objective.style.opacity = '1';
+  }
+  completeObjective() {
+    this.el.objective.classList.add('done');
+    this.el.objLabel.textContent = 'Complete';
+  }
+  hideObjective() { this.el.objective.style.opacity = '0'; }
 
   showScare() {
     this.el.scare.classList.remove('hidden');

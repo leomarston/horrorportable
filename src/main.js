@@ -13,7 +13,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -70,6 +70,13 @@ class Game {
       });
       this.ui.setBooks(0, this.pickups.total);
 
+      // Missions (more objectives will be added as the game grows).
+      this.objIndex = 0;
+      this._objCompleting = false;
+      this.objectives = [
+        { text: 'Get inside the house', check: () => this._isInsideHouse() },
+      ];
+
       // Pre-compile shaders so the first movements don't hitch.
       this.engine.renderer.compile(this.engine.scene, this.engine.camera);
       this.ui.setProgress(1);
@@ -96,7 +103,30 @@ class Game {
     this.state = 'playing';              // play immediately — never gate on pointer-lock
     this.sfx.resume();                   // unlock WebAudio under this click gesture
     this.sfx.startAmbience(AUDIO.ambienceVolume);
+    if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].text);
     if (!this.touch) this.input.requestLock(); // best-effort mouse capture (ok if denied)
+  }
+
+  _isInsideHouse() {
+    const p = this.player.position;
+    const i = INTERIOR;
+    if (p.x < i.minX || p.x > i.maxX || p.z < i.minZ || p.z > i.maxZ) return false;
+    const floor = this.world.collider.groundY(p.x, p.z, p.y + 0.3);
+    return floor != null && floor > i.floorAbove; // on the interior floor, not the yard
+  }
+
+  _checkObjectives() {
+    if (this._objCompleting || this.objIndex >= this.objectives.length) return;
+    if (this.objectives[this.objIndex].check()) {
+      this._objCompleting = true;
+      this.ui.completeObjective();
+      setTimeout(() => {
+        this._objCompleting = false;
+        this.objIndex++;
+        if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].text);
+        else this.ui.hideObjective();
+      }, 2200);
+    }
   }
 
   // ---------------- jumpscare ----------------
@@ -248,6 +278,7 @@ class Game {
       this._footsteps(dt);
       this._laughs(dt);
       this._chaseMusic();
+      this._checkObjectives();
 
       if (this.input.consumeEdge('interact')) {
         if (this.doors.interact(this.engine.camera)) this.sfx.play('door', { volume: AUDIO.doorVolume });
