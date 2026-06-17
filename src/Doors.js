@@ -41,7 +41,7 @@ export default class Doors {
 
     if (mesh.material) { mesh.material.side = THREE.DoubleSide; mesh.material.needsUpdate = true; }
 
-    const door = { mesh, pivot, angle: 0, target: 0, open: false };
+    const door = { mesh, pivot, angle: 0, target: 0, open: false, locked: false };
     this.doors.push(door);
     this.colliders.push({ geometry: closedGeom, active: () => Math.abs(door.angle) < DOOR.blockBelow });
   }
@@ -76,12 +76,19 @@ export default class Doors {
     return null;
   }
 
+  /** Returns 'toggled' if the door opened/closed, 'locked' if it won't budge, or false. */
   interact(camera) {
     const d = this.targeted(camera);
     if (!d) return false;
+    if (d.locked) return 'locked';
     d.open = !d.open;
     d.target = d.open ? DOOR.openAngle : 0;
-    return true;
+    return 'toggled';
+  }
+
+  /** Slam every door shut and lock it — the player can no longer open them. */
+  lockShut() {
+    for (const d of this.doors) { d.open = false; d.target = 0; d.locked = true; }
   }
 
   update(dt, camera, onPrompt) {
@@ -93,7 +100,7 @@ export default class Doors {
     }
     if (onPrompt) {
       const d = this.targeted(camera);
-      onPrompt(d ? (d.open ? 'Close door' : 'Open door') : null);
+      onPrompt(d ? (d.locked ? 'Locked' : (d.open ? 'Close door' : 'Open door')) : null);
     }
   }
 }

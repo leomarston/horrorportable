@@ -13,7 +13,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -74,6 +74,7 @@ class Game {
       this.objIndex = 0;
       this._objCompleting = false;
       this.intro = null;
+      this.trapSprung = false;             // front door slams + locks at the stairs (once)
       this.objectives = [
         { label: 'Objective 1: Get in the house', check: () => this._isInsideHouse() },
       ];
@@ -144,10 +145,25 @@ class Game {
       setTimeout(() => {
         this._objCompleting = false;
         this.objIndex++;
-        if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].text);
+        if (this.objIndex < this.objectives.length) this.ui.setObjective(this.objectives[this.objIndex].label);
         else this.ui.hideObjective();
       }, 2200);
     }
+  }
+
+  // ---- the stairs trap: first time the player nears the staircase, the front
+  // door slams shut and locks, and a new objective appears ----
+  _nearStairs() {
+    const p = this.player.position;
+    const dx = p.x - STAIRS.x, dz = p.z - STAIRS.z;
+    return dx * dx + dz * dz <= STAIRS.triggerRadius * STAIRS.triggerRadius;
+  }
+
+  _springTrap() {
+    this.trapSprung = true;
+    this.doors.lockShut();                                       // slam + lock the way out
+    this.sfx.play('door', { volume: AUDIO.doorVolume, rate: 0.82 }); // heavy slam
+    this.ui.setObjective('Objective 2: Find a way out');
   }
 
   // ---------------- jumpscare ----------------
@@ -303,9 +319,13 @@ class Game {
       this._chaseMusic();
       if (this.intro) this._updateIntro(dt);
       else this._checkObjectives();
+      // spring the stairs trap the first time the player gets close (inside only)
+      if (!this.trapSprung && !this.intro && this._isInsideHouse() && this._nearStairs()) this._springTrap();
 
       if (this.input.consumeEdge('interact')) {
-        if (this.doors.interact(this.engine.camera)) this.sfx.play('door', { volume: AUDIO.doorVolume });
+        const door = this.doors.interact(this.engine.camera);
+        if (door === 'toggled') this.sfx.play('door', { volume: AUDIO.doorVolume });
+        else if (door === 'locked') this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
         this.pickups.tryInteract();
       }
       this.doors.update(dt, this.engine.camera, (txt) => this.ui.setPrompt(txt));

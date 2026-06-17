@@ -105,6 +105,11 @@ export const PICKUPS = {
 // i.e. not the yard at ~-1.3).
 export const INTERIOR = { minX: -56, maxX: -22, minZ: -137, maxZ: -116, floorAbove: -0.8 };
 
+// The interior staircase (ascends to the upper floor along the east side of the
+// main room). When the player first comes within `triggerRadius` (XZ units) of
+// the stair foot, the front door slams shut and locks — trapping them inside.
+export const STAIRS = { x: -31, z: -126.5, triggerRadius: 4.5 };
+
 // Opening cinematic timings (seconds): fade up from black, hold the centred
 // objective title, then fly it to the corner.
 export const INTRO = { fade: 2.5, hold: 1.9, fly: 0.95 };
