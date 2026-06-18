@@ -42,6 +42,7 @@ export default class NavGrid {
     const cap = edges + n + 16;                 // heap may hold duplicate (lazy) entries up to #edges
     this._heap = new Int32Array(cap); this._hf = new Float32Array(cap);
     this._computeMain(); // tag the largest reachable component
+    this._computeAreas(opts.areaBin ?? 4); // spatially-uniform destinations for patrol/spawn
   }
 
   // Flood-fill connected components; keep the biggest as the reachable house area.
@@ -59,9 +60,26 @@ export default class NavGrid {
     for (let i = 0; i < N; i++) if (comp[i] === big) { this.main[i] = 1; this.mainNodes.push(i); }
   }
 
+  // One representative node per coarse XZ bin per floor → patrol destinations are
+  // spread evenly over the *house*, not weighted by how many cells a room has.
+  _computeAreas(bin) {
+    const seen = new Map();
+    for (const n of this.mainNodes) {
+      const key = Math.floor(this.X[n] / bin) + ',' + Math.floor(this.Z[n] / bin) + ',' + Math.round(this.Y[n] / 3);
+      if (!seen.has(key)) seen.set(key, n);
+    }
+    this.areas = [...seen.values()];
+  }
+
   /** A random reachable (main-component) node position — for spawning / wandering. */
   randomReachable(rng = Math.random) {
     const n = this.mainNodes[(rng() * this.mainNodes.length) | 0];
+    return new THREE.Vector3(this.X[n], this.Y[n], this.Z[n]);
+  }
+
+  /** A random spatially-spread area position (a "room" to patrol to). */
+  randomArea(rng = Math.random) {
+    const n = this.areas[(rng() * this.areas.length) | 0];
     return new THREE.Vector3(this.X[n], this.Y[n], this.Z[n]);
   }
 

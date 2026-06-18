@@ -306,7 +306,7 @@ export const MONSTER = {
 
   // --- whole-house path following ---
   repathChase: 0.4,          // seconds between path recomputes while chasing
-  waypointDist: 0.6,         // how close counts as "reached" a waypoint
+  waypointDist: 0.8,         // how close counts as "reached" a waypoint
   losChaseRange: 9,          // if it can SEE you within this, it steers straight at you
   navRadius: 0.3,            // body radius used for wall blocking (matches the nav)
   stepUp: 0.8,               // tallest single step it can climb (threads the staircase)

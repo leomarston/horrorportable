@@ -69,21 +69,22 @@ export default class Monster {
     this.nav = new NavGrid(collider, NAV.bounds, NAV); // whole-house multi-level pathfinding
     this.navR = MONSTER.navRadius;
     this.path = null; this._wp = 0; this._repathT = 0; this._pathT = 0; this._stuckT = 0;
+    this.wanderDest = null;                     // current patrol destination (a room)
 
-    const sp = this._pickSpawn();              // random reachable spot in the house
+    const sp = this._pickSpawn();              // random ground-floor room
     this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
     this.heading = Math.random() * Math.PI * 2;
 
     this._applyTransform();
   }
 
-  /** A random reachable ground-floor spot inside the house. */
+  /** A random ground-floor room to start in (spatially spread, not node-weighted). */
   _pickSpawn() {
-    for (let i = 0; i < 30; i++) {
-      const p = this.nav.randomReachable();
-      if (p.y < 0.6) return p;                  // prefer the ground floor for the initial spawn
+    for (let i = 0; i < 40; i++) {
+      const p = this.nav.randomArea();
+      if (p.y < 0.6) return p;                  // ground floor for the initial spawn
     }
-    return this.nav.randomReachable();
+    return this.nav.randomArea();
   }
 
   // ---- nav path following ----
@@ -93,22 +94,29 @@ export default class Monster {
     if (!this.path || this.path.length <= 1) this.path = null;
   }
 
-  /** Steer toward the current waypoint. Returns true once the path is finished. */
+  /** Follow the nav path waypoint by waypoint (the path itself routes around
+   * tables/walls and threads the stairs; turning smooths the dense waypoints). */
   _followPath(dt, speed, turnRate, dropTol) {
     if (!this.path || this._wp >= this.path.length) return true;
-    const wp = this.path[this._wp];
-    const dx = wp.x - this.pos.x, dz = wp.z - this.pos.z;
-    if (Math.hypot(dx, dz) < MONSTER.waypointDist) {
-      this._wp++;
-      if (this._wp >= this.path.length) { this.path = null; return true; }
+    while (this._wp < this.path.length) {                 // consume reached waypoints
+      const wp = this.path[this._wp];
+      if (Math.hypot(wp.x - this.pos.x, wp.z - this.pos.z) < MONSTER.waypointDist) this._wp++;
+      else break;
     }
-    const w2 = this.path[Math.min(this._wp, this.path.length - 1)];
-    const steer = this._avoidSteer(Math.atan2(w2.x - this.pos.x, w2.z - this.pos.z), this.navR + 0.5);
+    if (this._wp >= this.path.length) { this.path = null; return true; }
+    const wp = this.path[this._wp];
+    const steer = this._avoidSteer(Math.atan2(wp.x - this.pos.x, wp.z - this.pos.z), this.navR + 0.4);
     const d = this._turnToward(steer, turnRate, dt);
-    const want = Math.abs(d) > 1.1 ? speed * 0.4 : speed;
-    this.speed = THREE.MathUtils.damp(this.speed, want, 7, dt);
+    const want = Math.abs(d) > 1.2 ? speed * 0.45 : speed;
+    this.speed = THREE.MathUtils.damp(this.speed, want, 8, dt);
     if (this._advance(dt, dropTol)) this._stuckT = 0;
-    else if (!this._tryJump(this.heading)) { this._stuckT += dt; if (this._stuckT > 0.6) { this._stuckT = 0; return true; } } // give up this waypoint → repath
+    else if (!this._tryJump(this.heading)) {
+      this._stuckT += dt;
+      if (this._stuckT > 0.35) {            // stuck on this waypoint → skip to the next one
+        this._stuckT = 0; this._wp++;
+        if (this._wp >= this.path.length) { this.path = null; return true; }
+      }
+    }
     return false;
   }
 
@@ -137,8 +145,8 @@ export default class Monster {
   }
 
   // ---------------- navigation helpers ----------------
-  _rayHit(h, dist) {
-    const origin = this._tmp.set(this.pos.x, this.feetY + 1.0, this.pos.z);
+  _rayHit(h, dist, oy = 1.0) {
+    const origin = this._tmp.set(this.pos.x, this.feetY + oy, this.pos.z);
     _v.set(Math.sin(h), 0, Math.cos(h));
     this._ray.set(origin, _v); this._ray.far = dist;
     return this._ray.intersectObject(this.collider.mesh, false).length > 0;
@@ -158,15 +166,17 @@ export default class Monster {
   _advance(dt, dropTol) {
     if (this.speed < 0.01) { this.pos.y = this.feetY; return false; }
     const adv = this.speed * dt;
-    // hard wall block — never move into solid geometry
-    if (this._rayHit(this.heading, this.navR + adv + 0.1)) { this.speed = 0; return false; }
+    // hard wall block — never move into solid geometry (stair risers are below this)
+    if (this._rayHit(this.heading, this.navR + adv + 0.1, 1.0)) { this.speed = 0; return false; }
     const nx = this.pos.x + Math.sin(this.heading) * adv;
     const nz = this.pos.z + Math.cos(this.heading) * adv;
     const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
     if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; }   // void / big drop
     if (fy < INTERIOR.floorAbove - 0.5) { this.speed = 0; return false; }            // never drop out to the yard
     if (fy - this.feetY > MONSTER.stepUp) { this.speed = 0; return false; }          // too tall to step up
-    if (Math.abs(fy - this.feetY) < 1.4) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 12, dt);
+    // snap the feet up onto each stair step (no lag), ease down for a smooth descent
+    if (fy > this.feetY) this.feetY = Math.min(fy, this.feetY + adv + 0.5);
+    else if (Math.abs(fy - this.feetY) < 1.5) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 14, dt);
     this.pos.set(nx, this.feetY, nz);
     return true;
   }
@@ -255,9 +265,10 @@ export default class Monster {
     // chase — UNLESS it's gone relentless (after you take the gun), then it never stops.
     const inside = this._playerInside();
     const see = (inside || this.relentless) && this._canSee();
+    const wasChase = this.state === 'chase';
     if (see) {
       this.lastSeen.copy(this.player.position); this.loseTimer = 0;
-      if (this.state !== 'chase') this.state = 'chase';
+      if (this.state !== 'chase') { this.state = 'chase'; this.path = null; this._repathT = 0; }
     } else if (this.state === 'chase' && !this.relentless) {
       if (!inside) {
         this.state = 'wander';                  // stepped outside → give up immediately
@@ -274,6 +285,8 @@ export default class Monster {
         if (this.state === 'chase' && this.loseTimer > MONSTER.loseTime) this.state = 'wander';
       }
     }
+    // gave up → drop the chase path and resume the patrol trip it was on (wanderDest persists)
+    if (wasChase && this.state === 'wander') this.path = null;
 
     if (this.state === 'chase') this._chase(dt); else this._wander(dt);
 
@@ -291,32 +304,29 @@ export default class Monster {
     }
   }
 
+  // Always pursue via the nav (so it routes around tables/walls and up & down the
+  // stairs); the path's look-ahead makes the approach a straight sprint when clear.
   _chase(dt) {
     const p = this.player.position;
     const distP = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
-    // close + clear line of sight → steer straight at you (smooth final approach)
-    if (distP < MONSTER.losChaseRange && this._losToPlayer()) {
-      this.path = null;
-      const steer = this._avoidSteer(Math.atan2(p.x - this.pos.x, p.z - this.pos.z), MONSTER.avoidDist);
-      const d = this._turnToward(steer, MONSTER.chaseTurnRate, dt);
-      const want = Math.abs(d) > 1.0 ? MONSTER.runSpeed * 0.4 : MONSTER.runSpeed;
-      this.speed = THREE.MathUtils.damp(this.speed, distP < 0.8 ? 0 : want, 8, dt);
-      if (!this._advance(dt, MONSTER.dropTol)) this._tryJump(this.heading);
-    } else {
-      // out of sight / round a corner / up the stairs → follow the nav route. Relentless
-      // mode hunts your live position; otherwise it heads to where it last saw you.
-      const g = this.relentless ? p : this.lastSeen;
+    if (distP > MONSTER.catchDist * 0.8) {
+      const g = this.relentless ? p : this.lastSeen; // relentless hunts you live; else last seen
       this._repathT -= dt;
-      if (this._repathT <= 0 || !this.path) { this._repathT = MONSTER.repathChase; this._repath(g.x, g.y, g.z); }
+      if (this._repathT <= 0 || !this.path) { this._repathT = distP < 5 ? 0.15 : MONSTER.repathChase; this._repath(g.x, g.y, g.z); }
       if (this._followPath(dt, MONSTER.runSpeed, MONSTER.chaseTurnRate, MONSTER.dropTol)) this._repathT = 0;
+    } else {
+      this.path = null;                       // right on top of you → just face you
+      this._turnToward(Math.atan2(p.x - this.pos.x, p.z - this.pos.z), MONSTER.chaseTurnRate, dt);
+      this.speed = THREE.MathUtils.damp(this.speed, 0, 8, dt);
     }
-    // grab the player only with a clear line of sight (no grabbing through walls)
     if (this.canCatch && distP < MONSTER.catchDist && this._losToPlayer()) {
       this.state = 'caught'; this.speed = 0;
       if (this.onCaught) this.onCaught();
     }
   }
 
+  // Patrol the house: pick a far-off room, walk there, pause, pick a new one. A chase
+  // interrupts this but `wanderDest` persists, so afterwards it resumes the same trip.
   _wander(dt) {
     if (this.pauseLeft > 0) {
       this.pauseLeft -= dt;
@@ -325,11 +335,16 @@ export default class Monster {
       return;
     }
     if (!this.path) {
-      const dest = this.nav.randomReachable();      // roam the whole house
-      this._repath(dest.x, dest.y, dest.z);
-      if (!this.path) { this.pauseLeft = 0.4; return; }
+      if (!this.wanderDest) {
+        let pick = null;                      // a different room: a random area that's a decent walk away
+        for (let i = 0; i < 12; i++) { const a = this.nav.randomArea(); if ((a.x - this.pos.x) ** 2 + (a.z - this.pos.z) ** 2 > 49) { pick = a; break; } }
+        this.wanderDest = pick || this.nav.randomArea();
+      }
+      this._repath(this.wanderDest.x, this.wanderDest.y, this.wanderDest.z);
+      if (!this.path) { this.wanderDest = null; this.pauseLeft = 0.3; return; }
     }
     if (this._followPath(dt, MONSTER.walkSpeed, MONSTER.turnRate, 1.0)) {
+      this.wanderDest = null;                 // arrived → choose a new room next time
       this.pauseLeft = THREE.MathUtils.lerp(MONSTER.pauseRange[0], MONSTER.pauseRange[1], Math.random());
     }
   }
@@ -346,7 +361,7 @@ export default class Monster {
     const sp = this._pickSpawn();              // reappear somewhere reachable in the house
     this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
     this.speed = 0; this.heading = Math.random() * Math.PI * 2; this.pauseLeft = 1.0; this.loseTimer = 0;
-    this.jump = null; this.path = null; this._wp = 0; this._repathT = 0; this._stuckT = 0;
+    this.jump = null; this.path = null; this._wp = 0; this._repathT = 0; this._stuckT = 0; this.wanderDest = null;
     if (this.walk) this.walk.timeScale = 1.0;
     this._play(this.idle, 0.1);
     this._applyTransform();

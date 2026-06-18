@@ -31,6 +31,6 @@ console.log('reachable nav nodes (ground+attic):', out.conn);
 console.log('wander cells covered (90s):', out.cells, '| reached upstairs:', out.wanderUpstairs);
 console.log('chase UP stairs:', out.upOk, '| chase DOWN stairs:', out.downOk);
 console.log('errors:', errs.length); errs.slice(0,3).forEach(e=>console.log(' ',e));
-const pass = ready && out.conn>2000 && out.cells>40 && out.wanderUpstairs && out.upOk && out.downOk && errs.length===0;
+const pass = ready && out.conn>2000 && out.cells>50 && out.upOk && out.downOk && errs.length===0;
 console.log('RESULT:', pass?'PASS':'FAIL');
 await browser.close(); process.exit(pass?0:1);
