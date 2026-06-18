@@ -182,8 +182,8 @@ export const KEY = { collectDist: 1.2, interactDist: 2.6 };
 // above). We extend the wall with a brick panel (reusing the "Ladrillos"
 // material) + a collider. `debug:true` tints it bright for placement.
 export const BACKYARD_SEAL = {
-  x: -25.5, y: 1.05, z: -138.3,   // centre of the opening, flush with the brick wall
-  w: 8.8, h: 2.9, d: 0.4,         // covers x[-29.9,-21.1]: overlaps brick wall ↔ east wall
+  x: -23.8, y: 0.7, z: -138.1,    // centre of the opening, flush with the brick wall
+  w: 11.8, h: 3.6, d: 1.0,        // covers x[-29.7,-17.9] (brick wall → east wall), deep enough for the stepped pool edge
   tile: 0.85,                      // brick texture tiles-per-unit
   debug: false,
 };
