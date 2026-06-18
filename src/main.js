@@ -1,5 +1,6 @@
 import './styles.css';
 import * as THREE from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
 import Engine from './Engine.js';
 import { loadWorld } from './AssetLoader.js';
 import World from './World.js';
@@ -16,7 +17,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, KEY, DEBUG } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, KEY, BACKYARD_SEAL, DEBUG } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -60,6 +61,7 @@ class Game {
 
       this.doors = new Doors(this.engine.scene, this.engine.camera);
       this.player.extraColliders = this.doors.colliders;
+      this._sealBackyard(); // wall off the open backyard doorway near the kitchen
 
       const safeGltf = await Safe.load();
       this.safe = new Safe(this.engine.scene, this.engine.camera, safeGltf);
@@ -150,6 +152,21 @@ class Game {
     } else if (I.phase === 'settle') {
       if (I.t >= INTRO.fly) this.intro = null; // objective now rests top-left
     }
+  }
+
+  // Build a wall panel + collider that plugs the open backyard doorway.
+  _sealBackyard() {
+    const s = BACKYARD_SEAL;
+    const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
+    geo.translate(s.x, s.y, s.z);             // bake to world space
+    geo.boundsTree = new MeshBVH(geo);
+    this.player.extraColliders.push({ geometry: geo, active: () => true });
+    const mat = new THREE.MeshStandardMaterial({
+      color: s.debug ? 0xff2266 : 0x5b4a36, roughness: 0.96, metalness: 0,
+    });
+    this._sealWall = new THREE.Mesh(geo, mat);  // geo is already world-positioned
+    this._sealWall.castShadow = false; this._sealWall.receiveShadow = true;
+    this.engine.scene.add(this._sealWall);
   }
 
   _isInsideHouse() {

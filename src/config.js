@@ -177,6 +177,11 @@ export const GUN = {
 // The key Nulmire drops when killed — collect it, then unlock the front door.
 export const KEY = { collectDist: 1.2, interactDist: 2.6 };
 
+// Seal the open doorway to the backyard near the kitchen (there's no door mesh,
+// so the player could just walk out). A thin wall panel + collider plug it.
+// `debug:true` tints it bright for placement.
+export const BACKYARD_SEAL = { x: -26, y: 1.5, z: -138.5, w: 2.4, h: 3.0, d: 0.5, debug: false };
+
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {
   jumpscare: './audio/jumpscare.mp3',
