@@ -25,7 +25,8 @@ const opened = await page.evaluate(() => {
   return { interact:r, frozen:g.safe.frozen, relentless:g.monster.relentless,
            gunInSafe: !!g._gunDisplay, currentObjective:g.currentObjective };
 });
-await settle(2400);
+// the obj-5 reveal is on a deliberate ~2.2s timer; wait for it instead of racing a fixed sleep
+await page.waitForFunction(() => /Objective 5/.test(document.getElementById('obj-title').textContent), { timeout: 8000 }).catch(()=>{});
 const obj5 = await objText();
 
 // safe is now non-interactable
@@ -62,7 +63,8 @@ const hit = await page.evaluate(() => {
            obj5done:document.getElementById('obj-title').classList.contains('done'),
            keyDropped:g.key.active };
 });
-await settle(2400);
+// obj-6 reveal is also on a ~2.2s timer; wait for it rather than racing a fixed sleep
+await page.waitForFunction(() => /Objective 6/.test(document.getElementById('obj-title').textContent), { timeout: 8000 }).catch(()=>{});
 const obj6 = await page.evaluate(() => document.getElementById('obj-title').textContent);
 
 // door locked with no key yet → no escape

@@ -105,8 +105,9 @@ export default class Monster {
     }
     if (this._wp >= this.path.length) { this.path = null; return true; }
     const wp = this.path[this._wp];
-    const steer = this._avoidSteer(Math.atan2(wp.x - this.pos.x, wp.z - this.pos.z), this.navR + 0.4);
-    const d = this._turnToward(steer, turnRate, dt);
+    // steer straight at the waypoint — the nav route already hugs walls, so the
+    // local avoid-fan only fights it (it was nudging the monster off the stairs).
+    const d = this._turnToward(Math.atan2(wp.x - this.pos.x, wp.z - this.pos.z), turnRate, dt);
     const want = Math.abs(d) > 1.2 ? speed * 0.45 : speed;
     this.speed = THREE.MathUtils.damp(this.speed, want, 8, dt);
     if (this._advance(dt, dropTol)) this._stuckT = 0;
@@ -309,7 +310,10 @@ export default class Monster {
   _chase(dt) {
     const p = this.player.position;
     const distP = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
-    if (distP > MONSTER.catchDist * 0.8) {
+    const sameLevel = Math.abs((p.y - 1.5) - this.feetY) < 1.0; // player roughly on the monster's floor
+    // "right on top" only when actually beside you on the same level — NOT when you're
+    // directly above on the stairs (tiny XZ distance, big height gap) where it must keep climbing.
+    if (distP > MONSTER.catchDist * 0.8 || !sameLevel) {
       const g = this.relentless ? p : this.lastSeen; // relentless hunts you live; else last seen
       this._repathT -= dt;
       if (this._repathT <= 0 || !this.path) { this._repathT = distP < 5 ? 0.15 : MONSTER.repathChase; this._repath(g.x, g.y, g.z); }
