@@ -272,21 +272,19 @@ export const ADAPTIVE = {
   step: 0.08,
 };
 
-// The Momo monster — uses its own baked Walk / Idle / Attack clips. Lives on the
-// reachable ground floor; floor detection uses LOW rays (skips the upper floor).
+// The Momo monster — uses its own baked Walk / Idle / Attack clips. It knows the
+// whole house via a multi-level nav grid (NAV) and follows A* paths, so it can
+// reach every room and climb/descend the stairs between floors.
 export const MONSTER = {
   url: './models/momo.glb',
   height: 1.76,               // 80% size
   facingOffset: 0,            // model forward correction (rad)
   runAnimSpeed: 1.7,          // walk clip timeScale while chasing ("fast walking" = running)
-  home: { x: -38, z: -125 },   // centre of its patrol, on the ground floor
-  roam: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 },
-  floorScan: 1.4,             // ray starts this far above feet → skips the upper floor
+  floorScan: 1.4,             // floor-follow ray starts this far above the feet
   walkSpeed: 1.7,             // units/s (wandering)
   runSpeed: 3.7,             // units/s (chasing) — beatable: outrun by sprinting
   turnRate: 2.4,             // rad/s (wandering)
   chaseTurnRate: 4.2,        // rad/s (hunting)
-  arriveDist: 1.0,
   pauseRange: [1.0, 3.0],
 
   // --- hunting the player (tuned to be escapable) ---
@@ -297,8 +295,7 @@ export const MONSTER = {
   catchDist: 1.4,
   avoidDist: 2.4,
   losHeight: 1.35,           // eye height for line-of-sight rays (clears low furniture, blocked by walls)
-  giveUpPathDist: 16,        // gives up if the WALKABLE path to you grows beyond this (units)
-  navCell: 1.2,              // nav-grid cell size for path-distance checks
+  giveUpPathDist: 24,        // gives up if the WALKABLE path to you grows beyond this (units)
 
   // --- vaulting low obstacles (e.g. a table) ---
   jumpDist: 2.5,             // how far ahead it lands
@@ -306,5 +303,25 @@ export const MONSTER = {
   jumpDur: 0.55,             // seconds
   jumpClearH: 1.6,           // tallest obstacle top it can clear (above its feet)
   jumpCooldown: 1.2,         // min time between jumps
+
+  // --- whole-house path following ---
+  repathChase: 0.4,          // seconds between path recomputes while chasing
+  waypointDist: 0.6,         // how close counts as "reached" a waypoint
+  losChaseRange: 9,          // if it can SEE you within this, it steers straight at you
+  navRadius: 0.3,            // body radius used for wall blocking (matches the nav)
+  stepUp: 0.8,               // tallest single step it can climb (threads the staircase)
+  dropTol: 1.1,             // tallest drop it will take (stairs down, not ledges)
+};
+
+// Whole-house navigation grid the monster uses to know the entire map and the
+// stairs between floors (multi-level cells; steps link the floors).
+export const NAV = {
+  bounds: { minX: -57, maxX: -18, minZ: -139, maxZ: -114 },
+  cell: 0.4,
+  maxStep: 0.72,   // height a single grid step may rise/fall (threads the staircase)
+  bodyR: 0.3,      // clearance radius — small enough that doorways stay connected
+  clearH: 1.6,
+  floorMin: -0.7,  // ignore the yard (keeps it inside the house)
+  floorMax: 6.0,   // ignore the roof
 };
 
