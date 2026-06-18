@@ -190,7 +190,11 @@ export default class NavGrid {
     const ccx = Math.round((x - this.minX) / this.cell);
     const ccz = Math.round((z - this.minZ) / this.cell);
     let best = -1, bd = Infinity;
-    for (let r = 0; r <= 4 && best < 0; r++) {
+    // Expand rings until the closest a node in the NEXT ring could possibly be already
+    // exceeds the best found. Do NOT stop at the first ring with any node: a furniture
+    // pocket's cell may only hold the attic node directly overhead, while the real
+    // same-floor node is a ring or two out — stopping early snapped paths up to the attic.
+    for (let r = 0; r <= 16; r++) {
       for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
         const cx = ccx + dx, cz = ccz + dz;
@@ -198,10 +202,12 @@ export default class NavGrid {
         const list = this.cellNodes[this._ci(cx, cz)];
         if (!list) continue;
         for (const n of list) {
-          const d = (this.X[n] - x) ** 2 + ((this.Y[n] - y) * 2.5) ** 2 + (this.Z[n] - z) ** 2;
+          if (this.main && !this.main[n]) continue;   // only reachable nodes — never snap a path
+          const d = (this.X[n] - x) ** 2 + ((this.Y[n] - y) * 2.5) ** 2 + (this.Z[n] - z) ** 2; // onto an isolated ledge/roof node
           if (d < bd) { bd = d; best = n; }
         }
       }
+      if (best >= 0 && (r * this.cell) ** 2 > bd) break; // nothing further out can beat it
     }
     return best;
   }

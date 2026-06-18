@@ -17,8 +17,10 @@ const out = await page.evaluate(() => {
   // start the monster at the foot of the stairs, relentless, and let it hunt a stationary
   // player at the given spot. It must climb (no fall) and catch them.
   const run = (px,py,pz) => {
+    m.reset();                                     // full clean slate between cases
     const s = nodeAt(-29,-0.2,-126.6);
-    m.pos.set(s.x,s.y,s.z); m.feetY = s.y; m.path = null; m.speed = 0;
+    m.pos.set(s.x,s.y,s.z); m.feetY = s.y; m.path = null; m.speed = 0; m._progPos.set(s.x,s.y,s.z);
+    m.heading = -Math.PI / 2;                       // facing the stairs (−X), as it would mid-chase
     p.position.set(px,py,pz);
     m.state = 'chase'; m.relentless = true; m.canCatch = true; m.lastSeen.copy(p.position); m._repathT = 0;
     let caught = false, fell = false, prev = m.feetY, maxY = m.feetY;

@@ -69,6 +69,7 @@ export default class Monster {
     this.nav = new NavGrid(collider, NAV.bounds, NAV); // whole-house multi-level pathfinding
     this.navR = MONSTER.navRadius;
     this.path = null; this._wp = 0; this._repathT = 0; this._pathT = 0; this._stuckT = 0;
+    this._progPos = new THREE.Vector3();        // last position where it made real progress
     this.wanderDest = null;                     // current patrol destination (a room)
     this._patrol = [];                          // shuffled queue of every area → full-house coverage
 
@@ -111,12 +112,19 @@ export default class Monster {
     const d = this._turnToward(Math.atan2(wp.x - this.pos.x, wp.z - this.pos.z), turnRate, dt);
     const want = Math.abs(d) > 1.2 ? speed * 0.45 : speed;
     this.speed = THREE.MathUtils.damp(this.speed, want, 8, dt);
-    if (this._advance(dt, dropTol)) this._stuckT = 0;
-    else if (!this._tryJump(this.heading)) {
+    this._advance(dt, dropTol);
+    // Progress watchdog: collide-and-slide keeps it moving, but it can still grind a corner or
+    // oscillate in place. Track NET displacement — if it hasn't actually got anywhere for a
+    // moment, vault the obstacle or drop this waypoint and repath so it never locks up.
+    if (this.pos.distanceToSquared(this._progPos) > 0.09) { this._progPos.copy(this.pos); this._stuckT = 0; }
+    else {
       this._stuckT += dt;
-      if (this._stuckT > 0.35) {            // stuck on this waypoint → skip to the next one
-        this._stuckT = 0; this._wp++;
-        if (this._wp >= this.path.length) { this.path = null; return true; }
+      if (this._stuckT > 0.5) {                   // no real progress → drop this waypoint, repath
+        this._stuckT = 0;
+        if (!this._tryJump(this.heading)) {
+          this._wp++;
+          if (this._wp >= this.path.length) { this.path = null; return true; }
+        }
       }
     }
     return false;
@@ -168,14 +176,10 @@ export default class Monster {
   _advance(dt, dropTol) {
     if (this.speed < 0.01) { this.pos.y = this.feetY; return false; }
     const adv = this.speed * dt;
-    const nx = this.pos.x + Math.sin(this.heading) * adv;
-    const nz = this.pos.z + Math.cos(this.heading) * adv;
-    const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
-    // Probe the floor a FIXED step ahead (not speed-scaled, so a stalled monster can still
-    // tell it is on a stair). A gentle, climbable rise/drop there means a stair/ramp — not a
-    // wall. On the narrow staircase the forward wall ray (cast at feetY+1.0) snags the
-    // underside/fascia of the attic floor overhanging the upper steps, which jams the climb;
-    // honour that wall block only when the ground ahead is flat/blocked (a real wall).
+    // Probe a FIXED step ahead (not speed-scaled, so a stalled monster still knows it is on a
+    // stair). A gentle, climbable rise/drop there means a stair/ramp — not a wall. On the
+    // narrow staircase the forward wall ray snags the underside/fascia of the attic floor
+    // overhanging the upper steps, so the slide logic below is disabled while on a step.
     const look = this.navR + 0.45;
     const lfy = this.collider.groundY(this.pos.x + Math.sin(this.heading) * look,
                                       this.pos.z + Math.cos(this.heading) * look,
@@ -183,7 +187,25 @@ export default class Monster {
     const onStep = lfy != null && Math.abs(lfy - this.feetY) > 0.06
       && lfy >= this.feetY - dropTol && (lfy - this.feetY) <= MONSTER.stepUp
       && lfy >= INTERIOR.floorAbove - 0.5;
-    if (!onStep && this._rayHit(this.heading, this.navR + adv + 0.1, 1.0)) { this.speed = 0; return false; }
+
+    // Collide-and-slide: if a wall or furniture is dead ahead (and we're not climbing a
+    // stair), deflect to the nearest clear direction and keep moving instead of stopping
+    // dead. That is what stops the monster snagging on doorframes, corners and table edges.
+    let moveH = this.heading;
+    const reach = this.navR + adv + 0.12;
+    if (!onStep && this._blocked(this.heading, reach)) {
+      let best = null;                                       // limited cone — slide along the wall,
+      for (const a of [0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4]) { // never double back into a pocket
+        if (!this._blocked(this.heading + a, reach)) { best = this.heading + a; break; }
+      }
+      if (best === null) { this.speed = 0; return false; }   // genuinely boxed in
+      moveH = best;
+      this._turnToward(moveH, MONSTER.chaseTurnRate, dt);     // face the slide so it rounds the corner
+    }
+
+    const nx = this.pos.x + Math.sin(moveH) * adv;
+    const nz = this.pos.z + Math.cos(moveH) * adv;
+    const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
     if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; }   // void / big drop
     if (fy < INTERIOR.floorAbove - 0.5) { this.speed = 0; return false; }            // never drop out to the yard
     if (fy - this.feetY > MONSTER.stepUp) { this.speed = 0; return false; }          // too tall to step up
@@ -192,6 +214,12 @@ export default class Monster {
     else if (Math.abs(fy - this.feetY) < 1.5) this.feetY = THREE.MathUtils.damp(this.feetY, fy, 14, dt);
     this.pos.set(nx, this.feetY, nz);
     return true;
+  }
+
+  // A wall/furniture blocks here if EITHER a low ray (catches tables & low props) or a mid
+  // ray (catches walls & tall furniture) is obstructed within reach.
+  _blocked(h, reach) {
+    return this._rayHit(h, reach, 1.0) || this._rayHit(h, reach, 0.45);
   }
 
   /** Clear line of sight from the monster's eyes to the player (blocked by walls). */
