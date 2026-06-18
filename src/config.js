@@ -177,10 +177,16 @@ export const GUN = {
 // The key Nulmire drops when killed — collect it, then unlock the front door.
 export const KEY = { collectDist: 1.2, interactDist: 2.6 };
 
-// Seal the open doorway to the backyard near the kitchen (there's no door mesh,
-// so the player could just walk out). A thin wall panel + collider plug it.
-// `debug:true` tints it bright for placement.
-export const BACKYARD_SEAL = { x: -26, y: 1.5, z: -138.5, w: 2.4, h: 3.0, d: 0.5, debug: false };
+// Seal the open back wall by the pool (the brick wall just stops, leaving the
+// south side open from x≈-29.5 to -21.75 at z≈-138.3, with a brick lintel
+// above). We extend the wall with a brick panel (reusing the "Ladrillos"
+// material) + a collider. `debug:true` tints it bright for placement.
+export const BACKYARD_SEAL = {
+  x: -25.5, y: 1.05, z: -138.3,   // centre of the opening, flush with the brick wall
+  w: 8.8, h: 2.9, d: 0.4,         // covers x[-29.9,-21.1]: overlaps brick wall ↔ east wall
+  tile: 0.85,                      // brick texture tiles-per-unit
+  debug: false,
+};
 
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {

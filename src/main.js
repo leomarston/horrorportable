@@ -154,16 +154,37 @@ class Game {
     }
   }
 
-  // Build a wall panel + collider that plugs the open backyard doorway.
+  // Extend the brick back wall to plug the open span by the pool. Reuses the
+  // house's "Ladrillos" brick material (tiled) so it matches, + a collider.
   _sealBackyard() {
     const s = BACKYARD_SEAL;
     const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
     geo.translate(s.x, s.y, s.z);             // bake to world space
     geo.boundsTree = new MeshBVH(geo);
     this.player.extraColliders.push({ geometry: geo, active: () => true });
-    const mat = new THREE.MeshStandardMaterial({
-      color: s.debug ? 0xff2266 : 0x5b4a36, roughness: 0.96, metalness: 0,
-    });
+
+    let mat;
+    if (s.debug) {
+      mat = new THREE.MeshBasicMaterial({ color: 0xff2266 });
+    } else {
+      // grab the house's "Ladrillos" brick material and tile it to match
+      let brick = null;
+      this.world.root.traverse((o) => {
+        if (brick || !o.isMesh) return;
+        const list = Array.isArray(o.material) ? o.material : [o.material];
+        const m = list.find((mm) => /ladr/i.test(mm?.name || ''));
+        if (m) brick = m;
+      });
+      if (brick) {
+        mat = brick.clone();
+        for (const k of ['map', 'normalMap', 'roughnessMap', 'aoMap', 'metalnessMap']) {
+          if (mat[k]) { mat[k] = mat[k].clone(); mat[k].wrapS = mat[k].wrapT = THREE.RepeatWrapping; mat[k].repeat.set(s.w * s.tile, s.h * s.tile); mat[k].needsUpdate = true; }
+        }
+        mat.needsUpdate = true;
+      } else {
+        mat = new THREE.MeshStandardMaterial({ color: 0x6b5a44, roughness: 0.96, metalness: 0 });
+      }
+    }
     this._sealWall = new THREE.Mesh(geo, mat);  // geo is already world-positioned
     this._sealWall.castShadow = false; this._sealWall.receiveShadow = true;
     this.engine.scene.add(this._sealWall);
