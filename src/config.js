@@ -121,11 +121,11 @@ export const PICKUPS = {
 // Shown one line per paper as a "Paper found" note. 8 papers → 8 lines.
 export const PAPER_NOTES = [
   'We moved to our new house, yey',
-  'My daughter is acting weird',
-  'There is hair everywhere on her body',
-  'I hear her laughing every night',
-  'She does not speak anymore',
-  'SHE ATE A CAT, I SAW IT',
+  'My daughter Nulmire is acting weird',
+  'There is hair everywhere on Nulmire\'s body',
+  'I hear Nulmire laughing every night',
+  'Nulmire does not speak anymore',
+  'NULMIRE ATE A CAT, I SAW IT',
   'That thing is not my daughter',
   'SHOOT IT, THIS IS A MONSTER',
 ];

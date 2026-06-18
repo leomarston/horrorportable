@@ -21,7 +21,7 @@ const out = await page.evaluate(() => {
   }
   return { total, notes, goalText:document.getElementById('book-goal').textContent, safeUnlocked:g._papersDone };
 });
-const expected=['We moved to our new house, yey','My daughter is acting weird','There is hair everywhere on her body','I hear her laughing every night','She does not speak anymore','SHE ATE A CAT, I SAW IT','That thing is not my daughter','SHOOT IT, THIS IS A MONSTER'];
+const expected=['We moved to our new house, yey','My daughter Nulmire is acting weird',"There is hair everywhere on Nulmire's body",'I hear Nulmire laughing every night','Nulmire does not speak anymore','NULMIRE ATE A CAT, I SAW IT','That thing is not my daughter','SHOOT IT, THIS IS A MONSTER'];
 console.log('papers:', out.total, '| counter goal:', out.goalText, '| safe unlocked:', out.safeUnlocked);
 out.notes.forEach((n,i)=>console.log(`  #${i+1}: ${n.text}`));
 const pass = ready && out.total===8 && out.goalText==='8' && out.safeUnlocked===true && out.notes.length===8
