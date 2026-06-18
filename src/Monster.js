@@ -167,11 +167,22 @@ export default class Monster {
   _advance(dt, dropTol) {
     if (this.speed < 0.01) { this.pos.y = this.feetY; return false; }
     const adv = this.speed * dt;
-    // hard wall block — never move into solid geometry (stair risers are below this)
-    if (this._rayHit(this.heading, this.navR + adv + 0.1, 1.0)) { this.speed = 0; return false; }
     const nx = this.pos.x + Math.sin(this.heading) * adv;
     const nz = this.pos.z + Math.cos(this.heading) * adv;
     const fy = this.collider.groundY(nx, nz, this.feetY + MONSTER.floorScan);
+    // Probe the floor a FIXED step ahead (not speed-scaled, so a stalled monster can still
+    // tell it is on a stair). A gentle, climbable rise/drop there means a stair/ramp — not a
+    // wall. On the narrow staircase the forward wall ray (cast at feetY+1.0) snags the
+    // underside/fascia of the attic floor overhanging the upper steps, which jams the climb;
+    // honour that wall block only when the ground ahead is flat/blocked (a real wall).
+    const look = this.navR + 0.45;
+    const lfy = this.collider.groundY(this.pos.x + Math.sin(this.heading) * look,
+                                      this.pos.z + Math.cos(this.heading) * look,
+                                      this.feetY + MONSTER.floorScan);
+    const onStep = lfy != null && Math.abs(lfy - this.feetY) > 0.06
+      && lfy >= this.feetY - dropTol && (lfy - this.feetY) <= MONSTER.stepUp
+      && lfy >= INTERIOR.floorAbove - 0.5;
+    if (!onStep && this._rayHit(this.heading, this.navR + adv + 0.1, 1.0)) { this.speed = 0; return false; }
     if (fy == null || fy < this.feetY - dropTol) { this.speed = 0; return false; }   // void / big drop
     if (fy < INTERIOR.floorAbove - 0.5) { this.speed = 0; return false; }            // never drop out to the yard
     if (fy - this.feetY > MONSTER.stepUp) { this.speed = 0; return false; }          // too tall to step up
@@ -239,6 +250,14 @@ export default class Monster {
     return floor != null && floor > i.floorAbove;
   }
 
+  /** Is the player on a clearly different floor than the monster (i.e. up/down the
+   * stairs)? Compares the floor under the player to the monster's feet height. */
+  _playerCrossFloor() {
+    const p = this.player.position;
+    const pf = this.collider.groundY(p.x, p.z, p.y + 0.3);
+    return pf != null && Math.abs(pf - this.feetY) > 1.2;
+  }
+
   _canSee() {
     const p = this.player.position;
     const dx = p.x - this.pos.x, dz = p.z - this.pos.z;
@@ -273,6 +292,12 @@ export default class Monster {
     } else if (this.state === 'chase' && !this.relentless) {
       if (!inside) {
         this.state = 'wander';                  // stepped outside → give up immediately
+      } else if (this._playerCrossFloor()) {
+        // The player fled up (or down) the stairs to another floor. Losing sight through
+        // the floor must NOT make upstairs a safe zone — commit to the chase and hunt the
+        // player's live position across levels until the monster reaches their floor.
+        this.loseTimer = 0;
+        this.lastSeen.copy(this.player.position);
       } else {
         this.loseTimer += dt;
         // give up if the WALKABLE route to the player has grown too long (checked ~3x/s)
@@ -310,9 +335,10 @@ export default class Monster {
   _chase(dt) {
     const p = this.player.position;
     const distP = Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
-    const sameLevel = Math.abs((p.y - 1.5) - this.feetY) < 1.0; // player roughly on the monster's floor
-    // "right on top" only when actually beside you on the same level — NOT when you're
-    // directly above on the stairs (tiny XZ distance, big height gap) where it must keep climbing.
+    // Only "right on top" when truly beside you at the same height. The threshold is tight
+    // (half a step) so that a player one or more steps up the stairs still counts as ABOVE:
+    // otherwise the monster halts ~1 m below on the steps and never climbs the last stretch.
+    const sameLevel = Math.abs((p.y - 1.5) - this.feetY) < 0.5;
     if (distP > MONSTER.catchDist * 0.8 || !sameLevel) {
       const g = this.relentless ? p : this.lastSeen; // relentless hunts you live; else last seen
       this._repathT -= dt;

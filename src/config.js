@@ -280,7 +280,9 @@ export const MONSTER = {
   height: 1.76,               // 80% size
   facingOffset: 0,            // model forward correction (rad)
   runAnimSpeed: 1.7,          // walk clip timeScale while chasing ("fast walking" = running)
-  floorScan: 1.4,             // floor-follow ray starts this far above the feet
+  floorScan: 0.9,             // floor-follow ray starts this far above the feet (just over
+                             // stepUp, so it sees real steps but ignores the attic-floor
+                             // slab overhanging the upper stairs that used to jam the climb)
   walkSpeed: 1.7,             // units/s (wandering)
   runSpeed: 3.7,             // units/s (chasing) — beatable: outrun by sprinting
   turnRate: 2.4,             // rad/s (wandering)
