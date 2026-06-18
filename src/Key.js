@@ -20,9 +20,9 @@ export default class Key {
 
   _build() {
     const g = new THREE.Group();
+    const tex = this._concreteTexture();
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xe0ad3e, metalness: 0.85, roughness: 0.35,
-      emissive: 0x7a5410, emissiveIntensity: 0.9,
+      map: tex, color: 0x73695a, metalness: 0.04, roughness: 0.97, // dark, matte concrete-brown
     });
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.028, 8, 18), mat);
     ring.rotation.y = Math.PI / 2; g.add(ring);                       // bow (head)
@@ -30,9 +30,26 @@ export default class Key {
     shaft.rotation.z = Math.PI / 2; shaft.position.x = 0.2; g.add(shaft); // shaft
     const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.06, 0.02), mat); t1.position.set(0.32, -0.045, 0); g.add(t1);
     const t2 = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.085, 0.02), mat); t2.position.set(0.27, -0.055, 0); g.add(t2);
-    this.light = new THREE.PointLight(0xffc864, 0, 2.4, 2); g.add(this.light); // findable glow
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
     return g;
+  }
+
+  /** Small procedural concrete-grain texture (no asset needed). */
+  _concreteTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#46413a'; ctx.fillRect(0, 0, 64, 64);   // greyish concrete base
+    const img = ctx.getImageData(0, 0, 64, 64); const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const n = (Math.random() - 0.5) * 44;
+      d[i] = Math.max(0, Math.min(255, d[i] + n));
+      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.95));
+      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.85));
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
+    return tex;
   }
 
   drop(x, y, z) {
@@ -40,7 +57,6 @@ export default class Key {
     this.mesh.position.set(x, this._baseY, z);
     this.mesh.visible = true;
     this.active = true;
-    this.light.intensity = 6;
   }
 
   /** Spin/bob and auto-collect on walk-over. Returns true the frame it's taken. */
@@ -61,5 +77,5 @@ export default class Key {
   }
 
   _dist(p) { return Math.hypot(p.x - this.mesh.position.x, p.z - this.mesh.position.z); }
-  _collect() { this.collected = true; this.active = false; this.mesh.visible = false; this.light.intensity = 0; }
+  _collect() { this.collected = true; this.active = false; this.mesh.visible = false; }
 }
