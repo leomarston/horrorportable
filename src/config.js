@@ -185,6 +185,8 @@ export const AUDIO = {
   laugh: './audio/laugh.mp3',
   ambience: './audio/ambience.mp3',
   chase: './audio/chase.mp3',
+  gunshot: './audio/gunshot.mp3',
+  gunshotVolume: 0.9,
   footstepVolume: 0.22,
   footstepStride: 1.9,       // one footstep sound per ~2 steps (less frequent)
   laughEvery: [30, 70],      // random seconds between the monster's laughs (rare)

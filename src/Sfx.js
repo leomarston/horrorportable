@@ -24,7 +24,7 @@ export default class Sfx {
   // Fire-and-forget: each buffer becomes playable as soon as it decodes.
   loadAll() {
     if (!this.ctx) return;
-    for (const name of ['jumpscare', 'footstep', 'door', 'laugh', 'ambience', 'chase']) {
+    for (const name of ['jumpscare', 'footstep', 'door', 'laugh', 'ambience', 'chase', 'gunshot']) {
       fetch(AUDIO[name])
         .then((r) => r.arrayBuffer())
         .then((a) => this.ctx.decodeAudioData(a))
@@ -71,8 +71,9 @@ export default class Sfx {
     src.start();
   }
 
-  // Synthesised gunshot: a sharp filtered noise crack with a low thump.
+  // Gunshot: the provided fx if loaded, otherwise a synthesised fallback.
   gun() {
+    if (this.buffers.gunshot) { this.play('gunshot', { volume: AUDIO.gunshotVolume }); return; }
     if (!this.ctx) return;
     this.resume();
     const ctx = this.ctx, now = ctx.currentTime, dur = 0.22;
