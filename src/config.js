@@ -107,15 +107,28 @@ export const ATMOSPHERE = {
 // Papers are scattered RANDOMLY across the house ground floor each game, lie
 // flat on the floor, and do NOT glow. Collect by E, walking over, or touching.
 export const PICKUPS = {
-  goal: 10,                  // papers needed to win
+  goal: 8,                   // papers needed to win
   paperUrl: './models/paper.glb',
   paperSize: 0.42,           // sheet size in units
-  paperCount: 10,
+  paperCount: 8,
   paperArea: { minX: -53, maxX: -28, minZ: -131, maxZ: -118 }, // house ground-floor interior
   paperMinSep: 2.2,          // minimum spacing between papers (units)
   touchDist: 1.05,           // auto-collect: walk over / almost touching
   interactDist: 2.4,         // press E to collect a nearby paper
 };
+
+// The diary the papers tell, in the order they're COLLECTED (not where they lie).
+// Shown one line per paper as a "Paper found" note. 8 papers → 8 lines.
+export const PAPER_NOTES = [
+  'We moved to our new house, yey',
+  'My daughter is acting weird',
+  'There is hair everywhere on her body',
+  'I hear her laughing every night',
+  'She does not speak anymore',
+  'SHE ATE A CAT, I SAW IT',
+  'That thing is not my daughter',
+  'SHOOT IT, THIS IS A MONSTER',
+];
 
 // Region used to detect "inside the house" — the house footprint; a point counts
 // as inside only when its floor is the interior ground floor (above floorAbove,

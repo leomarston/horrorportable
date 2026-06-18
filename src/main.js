@@ -17,7 +17,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, KEY, BACKYARD_SEAL, DEBUG } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, KEY, BACKYARD_SEAL, DEBUG, PAPER_NOTES } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -366,6 +366,8 @@ class Game {
     this.paperCount++;
     this.ui.setBooks(this.paperCount, this.pickups.total);
     this.sfx.blip(880);
+    const note = PAPER_NOTES[this.paperCount - 1];   // the diary line for this pickup, in order
+    if (note) this.ui.showPaperNote(note);
     if (this.pickups.total > 0 && this.paperCount >= this.pickups.total) this._allPapersCollected();
   }
 

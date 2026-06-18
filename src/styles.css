@@ -180,6 +180,23 @@ canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
   filter: drop-shadow(0 2px 2px rgba(8,0,0,.85));
 }
 
+/* ---------- "Paper found" story note ---------- */
+.paper-note {
+  position: absolute; left: 0; right: 0; top: 28%;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  pointer-events: none; z-index: 24; opacity: 0; transition: opacity .5s ease;
+}
+.paper-note-label {
+  font-size: clamp(.72rem, 2.3vw, 1rem); letter-spacing: .42em; text-transform: uppercase;
+  color: #b59a5e; opacity: .9; margin-bottom: .55em;
+  text-shadow: 0 1px 6px rgba(0,0,0,.8);
+}
+.paper-note-text {
+  font-size: clamp(1.25rem, 4.4vw, 2.3rem); font-weight: 700; letter-spacing: .015em;
+  color: #ece2c8; max-width: 82%; line-height: 1.32;
+  text-shadow: 0 2px 16px rgba(0,0,0,.92), 0 0 2px rgba(0,0,0,.8);
+}
+
 /* ---------- Jumpscare ---------- */
 #scare { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
 .scare-flash { position: absolute; inset: 0; background: #fff; animation: scareFlash .5s ease-out forwards; }

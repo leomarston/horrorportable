@@ -73,10 +73,10 @@ console.log('\n--- ERRORS ('+errors.length+') ---'); errors.forEach(e=>console.l
 const pass = ready
   && start.result==='locked' && start.open===false && start.total===0 && start.revealed===false && startHidden===true
   && /find the safe/i.test(obj2)
-  && tryLocked.result==='locked' && tryLocked.open===false && tryLocked.total===10 && tryLocked.revealed===true
+  && tryLocked.result==='locked' && tryLocked.open===false && tryLocked.total===8 && tryLocked.revealed===true
   && afterTryHidden===false && afterTryDone===true
   && /Objective 3: Collect all the papers to unlock the safe/.test(obj3)
-  && collected.count===10 && collected.locked===false
+  && collected.count===8 && collected.locked===false
   && obj3Done===true
   && /Objective 4: Open the safe/.test(obj4)
   && opens.result==='opened' && opens.dir===1 && opens.done===true

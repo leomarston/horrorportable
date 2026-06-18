@@ -9,6 +9,7 @@ export default class UI {
       hud: $('hud'), hudHint: $('hud-hint'), stats: $('stats'), prompt: $('interact-prompt'),
       touch: $('touch'),
       bookCount: $('book-count'), bookGoal: $('book-goal'),
+      paperNote: $('paper-note'), paperNoteText: $('paper-note-text'),
       win: $('win'), winAgain: $('win-again'),
       scare: $('scare'), scareFlash: $('scare-flash'), scareText: $('scare-text'),
       objTitle: $('obj-title'), introFade: $('intro-fade'),
@@ -98,6 +99,22 @@ export default class UI {
   }
 
   showPaperCounter() { document.getElementById('book-counter').classList.remove('hidden'); }
+
+  // ---- "Paper found" story note: fades in, holds, fades out ----
+  showPaperNote(text) {
+    const el = this.el.paperNote;
+    this.el.paperNoteText.textContent = text;
+    el.classList.remove('hidden');
+    el.style.transition = 'opacity .5s ease';
+    el.style.opacity = '0'; void el.offsetWidth; // reflow so the fade-in plays
+    el.style.opacity = '1';
+    if (this._noteT1) clearTimeout(this._noteT1);
+    if (this._noteT2) clearTimeout(this._noteT2);
+    this._noteT1 = setTimeout(() => {
+      el.style.transition = 'opacity 1s ease'; el.style.opacity = '0';
+      this._noteT2 = setTimeout(() => el.classList.add('hidden'), 1000);
+    }, 4000);
+  }
 
   showWin(onAgain) {
     this.el.win.classList.remove('hidden');
