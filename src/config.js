@@ -181,11 +181,17 @@ export const KEY = { collectDist: 1.2, interactDist: 2.6 };
 // south side open from x≈-29.5 to -21.75 at z≈-138.3, with a brick lintel
 // above). We extend the wall with a brick panel (reusing the "Ladrillos"
 // material) + a collider. `debug:true` tints it bright for placement.
+// The pool is L-shaped (a strip also runs north along the east at x≈-21..-15),
+// so the room needs sealing on TWO sides: the south face AND its east edge.
 export const BACKYARD_SEAL = {
-  x: -23.8, y: 0.7, z: -138.1,    // centre of the opening, flush with the brick wall
-  w: 11.8, h: 3.6, d: 1.0,        // covers x[-29.7,-17.9] (brick wall → east wall), deep enough for the stepped pool edge
-  tile: 0.85,                      // brick texture tiles-per-unit
   debug: false,
+  tile: 0.85,                      // brick texture tiles-per-unit
+  panels: [
+    // south wall: brick-wall end → east, sealing the pool side
+    { x: -23.8, y: 0.7, z: -138.1, w: 11.8, h: 3.6, d: 1.0 },
+    // east return: the room's east edge, which opens onto the north-running pool strip
+    { x: -21.7, y: 0.7, z: -133.0, w: 1.2, h: 3.6, d: 11.4 },
+  ],
 };
 
 // Sound effects + music (loaded into Web Audio buffers at boot).
