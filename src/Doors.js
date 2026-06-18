@@ -91,6 +91,11 @@ export default class Doors {
     for (const d of this.doors) { d.open = false; d.target = 0; d.locked = true; }
   }
 
+  /** Unlock every door and swing it open (used when escaping with the key). */
+  unlock() {
+    for (const d of this.doors) { d.locked = false; d.open = true; d.target = DOOR.openAngle; }
+  }
+
   update(dt, camera, onPrompt) {
     for (const d of this.doors) {
       if (Math.abs(d.angle - d.target) > 1e-3) {

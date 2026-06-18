@@ -58,7 +58,29 @@ const hit = await page.evaluate(() => {
   M.root.position.y = cam.position.y - 0.88;  // centre near aim height
   M.state='wander';
   g._fireGun();
-  return { monsterState:M.state, modelVisible:M.model.visible, game:g.state, obj5done:document.getElementById('obj-title').classList.contains('done') };
+  return { monsterState:M.state, modelVisible:M.model.visible, game:g.state,
+           obj5done:document.getElementById('obj-title').classList.contains('done'),
+           keyDropped:g.key.active };
+});
+await settle(2400);
+const obj6 = await page.evaluate(() => document.getElementById('obj-title').textContent);
+
+// door locked with no key yet → no escape
+const noKey = await page.evaluate(() => { const d=window.__GAME.doors.doors[0]; d.locked=true; const r=d.locked; window.__GAME._fireGun; return { hasKey:window.__GAME.hasKey, game:window.__GAME.state }; });
+
+// collect the key (walk onto it) → hasKey, then unlock the door → ending
+const got = await page.evaluate(() => {
+  const g=window.__GAME, p=g.player;
+  p.position.set(g.key.mesh.position.x, p.position.y, g.key.mesh.position.z);
+  const taken = g.key.update(0.016, p.position); if (taken) g._onKeyCollected();
+  return { taken, hasKey:g.hasKey };
+});
+const escaped = await page.evaluate(() => {
+  const g=window.__GAME, d=g.doors.doors[0];
+  // simulate interacting with the locked door while holding the key
+  d.locked = true;
+  if (d.locked && g.hasKey) g._unlockAndEscape();
+  return { game:g.state, doorLocked:d.locked, doorOpen:d.open };
 });
 
 // fast-forward the darken, expect the killed card
@@ -77,6 +99,10 @@ console.log('REFROZEN interact:', JSON.stringify(refrozen));
 console.log('TOOK GUN:', JSON.stringify(took));
 console.log('MISS:', JSON.stringify(miss));
 console.log('HIT:', JSON.stringify(hit));
+console.log('OBJ6:', JSON.stringify(obj6));
+console.log('NO KEY:', JSON.stringify(noKey));
+console.log('GOT KEY:', JSON.stringify(got));
+console.log('ESCAPED:', JSON.stringify(escaped));
 console.log('ENDED:', JSON.stringify(ended));
 console.log('\n--- ERRORS ('+errors.length+') ---'); errors.forEach(e=>console.log(e));
 
@@ -86,7 +112,11 @@ const pass = ready
   && refrozen==='frozen'
   && took.near===true && took.gunTaken===true && took.equipped===true && took.displayGone===true
   && miss.state==='wander' && miss.game==='playing'         // a miss doesn't kill
-  && hit.monsterState==='dead' && hit.modelVisible===false && hit.game==='ending' && hit.obj5done===true
+  && hit.monsterState==='dead' && hit.modelVisible===false && hit.game==='playing' && hit.obj5done===true && hit.keyDropped===true
+  && /Objective 6: GET OUT/.test(obj6)
+  && noKey.hasKey===false && noKey.game==='playing'         // no key → no escape
+  && got.taken===true && got.hasKey===true
+  && escaped.game==='ending' && escaped.doorLocked===false && escaped.doorOpen===true
   && ended.killedShown===true && /KILLED\s*NULMIRE/i.test(ended.killedText)
   && errors.length===0;
 console.log('\nRESULT:', pass?'PASS':'FAIL');

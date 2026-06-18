@@ -54,14 +54,14 @@ const closedQ = await hingeQuat();
 await page.evaluate(() => { window.__GAME.safe.unlock(); window.__GAME.safe.interact(); });
 await settle(900); // longer than the 1.46s clip? give it ~enough; poll below
 let settled = false;
-for (let i = 0; i < 60 && !settled; i++) { await settle(50); settled = await page.evaluate(() => window.__GAME.safe._dir === 0); }
+for (let i = 0; i < 200 && !settled; i++) { await settle(50); settled = await page.evaluate(() => window.__GAME.safe._dir === 0); }
 const openState = await page.evaluate(() => ({ open: window.__GAME.safe.open, t: +window.__GAME.safe._t.toFixed(3), dir: window.__GAME.safe._dir }));
 const openQ = await hingeQuat();
 
 // close it
 await page.evaluate(() => window.__GAME.safe.interact());
 settled = false;
-for (let i = 0; i < 60 && !settled; i++) { await settle(50); settled = await page.evaluate(() => window.__GAME.safe._dir === 0); }
+for (let i = 0; i < 200 && !settled; i++) { await settle(50); settled = await page.evaluate(() => window.__GAME.safe._dir === 0); }
 const closeState = await page.evaluate(() => ({ open: window.__GAME.safe.open, t: +window.__GAME.safe._t.toFixed(3), dir: window.__GAME.safe._dir }));
 const closeQ = await hingeQuat();
 

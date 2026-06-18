@@ -7,6 +7,7 @@ import Player from './Player.js';
 import Doors from './Doors.js';
 import Safe from './Safe.js';
 import Gun from './Gun.js';
+import Key from './Key.js';
 import Monster from './Monster.js';
 import Pickups from './Pickups.js';
 import Flashlight from './Flashlight.js';
@@ -15,7 +16,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, DEBUG } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, KEY, DEBUG } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -67,6 +68,9 @@ class Game {
       const gunGltf = await Gun.load();
       this.gun = new Gun(this.engine.scene, this.engine.camera, gunGltf);
       this.gunTaken = false;        // becomes true once the player takes it from the safe
+
+      this.key = new Key(this.engine.scene); // Nulmire drops this when killed
+      this.hasKey = false;
 
       this.ui.setStatus('something stirs inside…');
       const monsterGltf = await Monster.load();
@@ -368,18 +372,38 @@ class Game {
     return true;
   }
 
-  // Shot dead → explode + scream, complete Objective 5, then the win cinematic.
+  // Shot dead → explode + scream, drop the key, complete Objective 5 → "GET OUT".
   _killMonster() {
     if (this.monster.state === 'dead') return;
+    const at = this.monster.root.position;
     this.monster.kill();
     this._chasing = false; this.sfx.stopChase();
     this.sfx.play('jumpscare', { volume: AUDIO.jumpscareVolume }); // dies screaming
-    this._spawnExplosion(this.monster.root.position);
-    this.ui.completeObjective();                   // Objective 5 ✓
+    this._spawnExplosion(at);
+    this.key.drop(at.x, this.monster.feetY, at.z);  // Nulmire drops the key
+    this.ui.completeObjective();                    // Objective 5 ✓
+    this.currentObjective = 'Objective 6: GET OUT';
+    if (this._obj6Timer) clearTimeout(this._obj6Timer);
+    this._obj6Timer = setTimeout(() => {
+      if (this.state === 'playing' && !this.nightCardLock) this.ui.setObjective(this.currentObjective);
+    }, 2200);
+  }
+
+  _onKeyCollected() {
+    this.hasKey = true;
+    this.sfx.blip(740);
+  }
+
+  // Unlock the front door with the key → the escape cinematic (slow darken).
+  _unlockAndEscape() {
+    if (this.state === 'ending') return;
+    this.doors.unlock();
+    this.sfx.play('door', { volume: AUDIO.doorVolume });
+    this.ui.completeObjective();                    // Objective 6 ✓
     this.currentObjective = null;
-    this.state = 'ending';                         // Nulmire dropped the key; you get out
+    this.state = 'ending';
     this.ending = { t: 0 }; this._endShown = false;
-    this.ui.fadeShow(); this.ui.fadeSet(0);        // start darkening from clear
+    this.ui.fadeShow(); this.ui.fadeSet(0);
   }
 
   _spawnExplosion(pos) {
@@ -510,6 +534,8 @@ class Game {
       this.pickups.update(dt);
       this.safe.update(dt);
       this.gun.update(dt);
+      if (this.key.update(dt, this.player.position)) this._onKeyCollected(); // walk-over pickup
+      this._updateExplosion(dt);
 
       this.sfx.setListener(this.engine.camera);
       this.sfx.startAmbience(AUDIO.ambienceVolume); // starts once the buffer is ready
@@ -524,7 +550,10 @@ class Game {
       if (this.input.consumeEdge('interact')) {
         const door = this.doors.interact(this.engine.camera);
         if (door === 'toggled') this.sfx.play('door', { volume: AUDIO.doorVolume });
-        else if (door === 'locked') this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
+        else if (door === 'locked') {
+          if (this.hasKey) this._unlockAndEscape();   // unlock the front door with the key → escape
+          else this.sfx.play('door', { volume: AUDIO.doorVolume * 0.4, rate: 1.5 }); // futile rattle
+        }
         else if (this._safeOpenedDone && !this.gunTaken && this._nearSafe()) {
           this._takeGun();                          // take the pistol from the open safe
         } else if (!this.safe.frozen && this.safe.targeted()) {
@@ -538,12 +567,14 @@ class Game {
           }
         }
         this.pickups.tryInteract();
+        if (this.key.collectIfNear(this.player.position)) this._onKeyCollected();
       }
       if (this.input.consumeEdge('fire') && this.gunTaken) this._fireGun();
 
-      // prompts: door, then take-the-gun, then the safe
+      // prompts: door (unlock with the key when locked), then take-the-gun, then the safe
       let prompt = null;
       this.doors.update(dt, this.engine.camera, (txt) => { prompt = txt; });
+      if (prompt === 'Locked' && this.hasKey) prompt = 'Unlock door';
       if (!prompt) {
         if (this._safeOpenedDone && !this.gunTaken && this._nearSafe()) prompt = 'Take the pistol';
         else if (!this.safe.frozen && this.safe.targeted()) prompt = this.safe.open ? 'Close safe' : 'Open safe';

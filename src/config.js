@@ -174,6 +174,9 @@ export const GUN = {
   takeDist: 3.4,               // how close you must be to the safe to take the gun
 };
 
+// The key Nulmire drops when killed — collect it, then unlock the front door.
+export const KEY = { collectDist: 1.2, interactDist: 2.6 };
+
 // Sound effects + music (loaded into Web Audio buffers at boot).
 export const AUDIO = {
   jumpscare: './audio/jumpscare.mp3',
