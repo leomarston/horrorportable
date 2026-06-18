@@ -70,6 +70,7 @@ export default class Monster {
     this.navR = MONSTER.navRadius;
     this.path = null; this._wp = 0; this._repathT = 0; this._pathT = 0; this._stuckT = 0;
     this.wanderDest = null;                     // current patrol destination (a room)
+    this._patrol = [];                          // shuffled queue of every area → full-house coverage
 
     const sp = this._pickSpawn();              // random ground-floor room
     this.feetY = sp.y; this.pos.copy(sp); this.target.copy(sp);
@@ -365,11 +366,7 @@ export default class Monster {
       return;
     }
     if (!this.path) {
-      if (!this.wanderDest) {
-        let pick = null;                      // a different room: a random area that's a decent walk away
-        for (let i = 0; i < 12; i++) { const a = this.nav.randomArea(); if ((a.x - this.pos.x) ** 2 + (a.z - this.pos.z) ** 2 > 49) { pick = a; break; } }
-        this.wanderDest = pick || this.nav.randomArea();
-      }
+      if (!this.wanderDest) this.wanderDest = this._pickWanderDest();
       this._repath(this.wanderDest.x, this.wanderDest.y, this.wanderDest.z);
       if (!this.path) { this.wanderDest = null; this.pauseLeft = 0.3; return; }
     }
@@ -377,6 +374,22 @@ export default class Monster {
       this.wanderDest = null;                 // arrived → choose a new room next time
       this.pauseLeft = THREE.MathUtils.lerp(MONSTER.pauseRange[0], MONSTER.pauseRange[1], Math.random());
     }
+  }
+
+  /** Next patrol room: walk a shuffled queue of EVERY area so the monster roams the whole
+   * house once before repeating (random-with-replacement kept re-visiting the same few
+   * rooms), then reshuffle and go again. A pick it is already standing on just yields no
+   * path and the next one is taken — so every area is covered each cycle. */
+  _pickWanderDest() {
+    if (this._patrol.length === 0) {                       // refill + Fisher–Yates shuffle
+      this._patrol = this.nav.areas.slice();
+      for (let i = this._patrol.length - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        const t = this._patrol[i]; this._patrol[i] = this._patrol[j]; this._patrol[j] = t;
+      }
+    }
+    const n = this._patrol.pop();
+    return new THREE.Vector3(this.nav.X[n], this.nav.Y[n], this.nav.Z[n]);
   }
 
   /** Shot dead: stop, hide the body (the game spawns the explosion). */

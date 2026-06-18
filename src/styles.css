@@ -158,10 +158,26 @@ canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
   opacity: 0; transition: opacity .6s ease;
 }
 .night-card span {
-  font-weight: 800; letter-spacing: .22em; font-size: clamp(2.4rem, 11vw, 6rem);
-  color: #9c1414;
-  text-shadow: 0 0 26px rgba(150,15,15,.85), 0 0 70px rgba(120,8,8,.5), 0 3px 0 #2a0606;
-  filter: drop-shadow(0 0 2px #4a0808);
+  position: relative;
+  font-weight: 900; letter-spacing: .18em; font-size: clamp(2.4rem, 11vw, 6rem);
+  /* deep wet blood — richer at the top, pooling darker toward the bottom (no neon glow) */
+  color: #6b0a0a;                                              /* fallback */
+  background: linear-gradient(180deg, #931111 0%, #6c0909 50%, #3c0404 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  /* tight, dark depth so it reads as painted blood, NOT a light source */
+  filter: drop-shadow(0 2px 1px rgba(12,0,0,.95)) drop-shadow(0 5px 7px rgba(30,2,2,.5));
+}
+/* blood running down off the letters */
+.night-card span::after {
+  content: ""; position: absolute; left: 4%; right: 4%; top: 80%; height: 100%;
+  pointer-events: none; opacity: .92;
+  background:
+    radial-gradient(6px 15px at 14% 16%, #5c0707 0 56%, transparent 60%),
+    radial-gradient(5px 30px at 33% 8%,  #480505 0 60%, transparent 63%),
+    radial-gradient(7px 13px at 57% 22%, #680909 0 56%, transparent 60%),
+    radial-gradient(5px 24px at 78% 12%, #420404 0 60%, transparent 63%),
+    radial-gradient(4px 18px at 91% 20%, #560606 0 60%, transparent 63%);
+  filter: drop-shadow(0 2px 2px rgba(8,0,0,.85));
 }
 
 /* ---------- Jumpscare ---------- */
