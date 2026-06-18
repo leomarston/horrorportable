@@ -9,6 +9,10 @@
 
 export const ASSET_URL = './models/abandoned_house.glb';
 
+// Testing toggles. monsterCanKill:false → Nulmire still chases but can't grab
+// you (no jumpscare / no losing a night). Set back to true to restore the game.
+export const DEBUG = { monsterCanKill: false };
+
 // The house's front door — a single isolated mesh using the "Puerta" material.
 // It's kept out of the static collider and driven by the Doors system instead.
 export const DOOR = {

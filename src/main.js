@@ -15,7 +15,7 @@ import PostFX from './PostFX.js';
 import UI from './UI.js';
 import Sfx from './Sfx.js';
 import { getPreset, isTouchDevice } from './Quality.js';
-import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN } from './config.js';
+import { ASSET_URL, MONSTER, AUDIO, INTERIOR, INTRO, STAIRS, SAFE, NIGHTS, GUN, DEBUG } from './config.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -72,6 +72,7 @@ class Game {
       const monsterGltf = await Monster.load();
       this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
       this.monster.onCaught = () => this._jumpscare();
+      this.monster.canCatch = DEBUG.monsterCanKill; // testing: false → it can't kill you
 
       this.paperCount = 0;
       this.papersRevealed = false;   // papers + counter appear only once Objective 3 begins

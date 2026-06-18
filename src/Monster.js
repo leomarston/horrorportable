@@ -64,6 +64,7 @@ export default class Monster {
     this.speed = 0; this.t = 0; this.pauseLeft = 1.0;
     this.state = 'wander'; this.lastSeen = new THREE.Vector3(); this.loseTimer = 0; this.onCaught = null; this._avoidSide = 0;
     this.relentless = false; // once true (gun taken), it never gives up the chase
+    this.canCatch = true;    // when false (testing), it chases but can't grab/kill you
     this.jump = null; this._jumpCdUntil = 0;
     this.nav = new Nav(collider, MONSTER.roam, MONSTER.navCell); // for walkable-distance give-up
     this._pathT = 0;
@@ -294,7 +295,7 @@ export default class Monster {
 
     // grab the player only with a clear line of sight (no grabbing through walls)
     const p = this.player.position;
-    if (Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < MONSTER.catchDist && this._losToPlayer()) {
+    if (this.canCatch && Math.hypot(p.x - this.pos.x, p.z - this.pos.z) < MONSTER.catchDist && this._losToPlayer()) {
       this.state = 'caught'; this.speed = 0;
       if (this.onCaught) this.onCaught();
     }
