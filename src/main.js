@@ -65,7 +65,7 @@ class Game {
 
       const safeGltf = await Safe.load();
       this.safe = new Safe(this.engine.scene, this.engine.camera, safeGltf);
-      this.safe.place(SAFE.x, SAFE.y, SAFE.z, SAFE.yaw); // on the kitchen counter (for now)
+      // placed below once the nav grid exists (a random reachable spot in the house)
 
       const gunGltf = await Gun.load();
       this.gun = new Gun(this.engine.scene, this.engine.camera, gunGltf);
@@ -79,6 +79,8 @@ class Game {
       this.monster = new Monster(this.engine.scene, this.world.collider, monsterGltf, this.player);
       this.monster.onCaught = () => this._jumpscare();
       this.monster.canCatch = DEBUG.monsterCanKill; // testing: false → it can't kill you
+
+      this._placeSafe(); // drop the safe at a random reachable spot in the house
 
       this.paperCount = 0;
       this.papersRevealed = false;   // papers + counter appear only once Objective 3 begins
@@ -309,6 +311,41 @@ class Game {
   }
 
   // ---------------- safe / papers ----------------
+  // Drop the safe at a random, reachable ground-floor spot, with its door turned
+  // toward the most open direction so the player can approach and open it.
+  _placeSafe() {
+    const nav = this.monster.nav;
+    const sp = this.world.spawnPoint;
+    let spot = null;
+    for (let i = 0; i < 80; i++) {
+      const a = nav.randomArea();                                   // spatially spread
+      if (a.y > 0.6) continue;                                      // ground floor only
+      if (sp && (a.x - sp.x) ** 2 + (a.z - sp.z) ** 2 < 49) continue; // not right at the entrance (>7u)
+      spot = a; break;
+    }
+    if (!spot) spot = nav.randomReachable();
+    const dir = this._openestDir(spot.x, spot.y + 0.5, spot.z);     // face the door into open space
+    const yaw = Math.atan2(dir.x, dir.z);
+    this.safePos = { x: spot.x, y: spot.y, z: spot.z, yaw };
+    this.safe.place(spot.x, spot.y, spot.z, yaw);
+  }
+
+  /** The most open horizontal direction from a point (longest unobstructed ray). */
+  _openestDir(x, y, z) {
+    const ray = this._safeRay || (this._safeRay = new THREE.Raycaster());
+    const o = new THREE.Vector3(x, y, z), d = new THREE.Vector3();
+    let bestDir = new THREE.Vector3(1, 0, 0), bestLen = -1;
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2;
+      d.set(Math.sin(ang), 0, Math.cos(ang));
+      ray.set(o, d); ray.far = 6;
+      const hit = ray.intersectObject(this.world.collider.mesh, false);
+      const len = hit.length ? hit[0].distance : 6;
+      if (len > bestLen) { bestLen = len; bestDir.copy(d); }
+    }
+    return bestDir.clone();
+  }
+
   // Trying the locked safe completes "find the safe" and starts Objective 3,
   // which is when the papers scatter and the counter appears.
   _onSafeLocked() {
@@ -357,8 +394,9 @@ class Game {
     this.ui.completeObjective();                   // Objective 4 ✓
 
     this._gunDisplay = this.gun.makeSafeInstance(); // the pistol lying flat at the open safe's mouth
-    this._gunDisplay.position.set(GUN.safePos.x, GUN.safePos.y, GUN.safePos.z);
-    this._gunDisplay.rotation.set(GUN.safeRot.x, GUN.safeRot.y, GUN.safeRot.z);
+    const sp = this.safePos, fx = Math.sin(sp.yaw), fz = Math.cos(sp.yaw); // door-facing (world)
+    this._gunDisplay.position.set(sp.x + fx * 0.6, sp.y + GUN.safePos.y - SAFE.y, sp.z + fz * 0.6);
+    this._gunDisplay.rotation.set(GUN.safeRot.x, GUN.safeRot.y + (sp.yaw - SAFE.yaw), GUN.safeRot.z);
     this.engine.scene.add(this._gunDisplay);
 
     this.monster.relentless = true;                // it will never give up now
@@ -370,8 +408,8 @@ class Game {
   }
 
   _nearSafe() {
-    const p = this.player.position;
-    return Math.hypot(p.x - SAFE.x, p.z - SAFE.z) < GUN.takeDist;
+    const p = this.player.position, s = this.safePos;
+    return Math.hypot(p.x - s.x, p.z - s.z) < GUN.takeDist;
   }
 
   _takeGun() {

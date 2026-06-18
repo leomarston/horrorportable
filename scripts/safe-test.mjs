@@ -1,5 +1,5 @@
-// Headless test: the safe loads, sits on the kitchen counter, and its door
-// actually animates open + closed on interaction (a hinge bone pose changes).
+// Headless test: the safe loads and its door actually animates open + closed
+// on interaction (a hinge bone pose changes).
 import puppeteer from 'puppeteer';
 
 const CHROME = '.browser/chrome-linux64/chrome';

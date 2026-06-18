@@ -34,7 +34,7 @@ const refrozen = await page.evaluate(() => window.__GAME.safe.interact());
 
 // take the gun (stand by the safe)
 const took = await page.evaluate(() => {
-  const g=window.__GAME, p=g.player, S={x:-34.25,z:-130.2};
+  const g=window.__GAME, p=g.player, S=g.safePos; // safe spawns at a random spot now
   p.position.set(S.x+1, p.position.y, S.z); // within takeDist
   const near = g._nearSafe();
   g._takeGun();

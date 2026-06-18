@@ -149,8 +149,10 @@ export const NIGHTS = {
 export const SAFE = {
   url: './models/safe.glb',
   height: 0.6,                 // target height in units (a small tabletop safe)
-  x: -34.25, y: 0.98, z: -130.2, // sitting on the kitchen counter top
-  yaw: -Math.PI / 2,           // face the door toward the player's approach side
+  // The safe now spawns at a random reachable spot each game (see _placeSafe). These
+  // x/y/yaw remain only as the authoring reference the gun-in-safe offset is derived from.
+  x: -34.25, y: 0.98, z: -130.2,
+  yaw: -Math.PI / 2,
   range: 3.2,                  // how close you must look at it to interact (units)
   openRate: 1.0,               // animation playback speed (×)
 };
